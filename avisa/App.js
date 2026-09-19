@@ -57,8 +57,7 @@ export default function App() {
 
       if (data.type === 'updateInterests') {
         if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
-        const interesses = discenteAuthRoutes.updateUserInterests(user.id_usuario, data.interests);
-        setUser((currentUser) => ({ ...currentUser, interesses }));
+        discenteAuthRoutes.updateUserInterests(user.id_usuario, data.interests);
       }
     } catch (error) {
       Alert.alert('Não foi possível concluir', error.message);
