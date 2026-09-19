@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Perfil — AVISA</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="logo" href="inicio.html" aria-label="AVISA">
+          <span class="logo-mark">!</span>
+          <span class="logo-word">avisa<span>!</span></span>
+        </a>
+        <nav class="nav" aria-label="Navegação principal">
+          <a href="inicio.html">Início</a>
+          <a class="active" href="perfil.html">Perfil</a>
+          <a href="index.html">Sair</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="page-head">
+          <div>
+            <h1>Meu perfil</h1>
+            <p>Confira seus dados cadastrados no AVISA.</p>
+          </div>
+        </header>
+
+        <section class="profile-detail">
+          <div class="avatar profile-avatar">{{INICIAIS_USUARIO}}</div>
+          <div>
+            <h2>{{NOME_USUARIO}}</h2>
+            <p>Discente</p>
+          </div>
+          <dl class="profile-fields">
+            <div><dt>E-mail institucional</dt><dd>{{EMAIL_USUARIO}}</dd></div>
+            <div><dt>Matrícula</dt><dd>{{MATRICULA_USUARIO}}</dd></div>
+            <div><dt>Curso</dt><dd>{{CURSO_USUARIO}}</dd></div>
+          </dl>
+          <a class="btn profile-action" href="inicio.html">Voltar para eventos</a>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

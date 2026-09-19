@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login — AVISA</title>
+    <link rel="icon" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;1,9..144,700&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="auth-shell">
+      <aside class="brand-panel">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="brand-content">
+          <div class="brand-logo">
+            <a class="logo" href="index.html" aria-label="AVISA">
+              <span class="logo-mark">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
+              </span>
+              <span class="logo-word">avisa<span>!</span></span>
+            </a>
+          </div>
+          <p class="brand-copy">Plataforma de Eventos Acadêmicos</p>
+        </div>
+      </aside>
+
+      <main class="form-panel">
+        <form class="form-card" action="inicio.html" method="get">
+          <h1>Bem-vindo de volta</h1>
+          <p class="lede">Entre na sua conta para continuar</p>
+
+          <div class="field">
+            <label for="email">E-mail</label>
+            <div class="input-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="20" height="16" x="2" y="4" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+              <input id="email" name="email" type="email" placeholder="seu@email.com" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="password">Senha</label>
+            <div class="input-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="18" height="11" x="3" y="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input id="password" name="password" type="password" placeholder="••••••••" />
+            </div>
+          </div>
+
+          <button class="btn" type="submit">Entrar</button>
+          <p class="switch-auth">Não tem conta? <a href="cadastro.html">Cadastre-se</a></p>
+        </form>
+      </main>
+    </div>
+  </body>
+</html>

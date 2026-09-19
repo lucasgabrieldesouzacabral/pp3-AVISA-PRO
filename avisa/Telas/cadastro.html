@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cadastro — AVISA</title>
+    <link rel="icon" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;1,9..144,700&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="auth-shell">
+      <aside class="brand-panel">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="brand-content">
+          <div class="brand-logo">
+            <a class="logo" href="index.html" aria-label="AVISA">
+              <span class="logo-mark">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
+              </span>
+              <span class="logo-word">avisa<span>!</span></span>
+            </a>
+          </div>
+          <p class="brand-copy">Junte-se à comunidade acadêmica</p>
+        </div>
+      </aside>
+
+      <main class="form-panel">
+        <form class="form-card" action="inicio.html" method="get">
+          <h1>Criar conta</h1>
+          <p class="lede">Preencha seus dados para se cadastrar</p>
+
+          <div class="field">
+            <label for="name">Nome completo</label>
+            <div class="input-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <input id="name" name="name" placeholder="Seu nome" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="email">E-mail institucional</label>
+            <div class="input-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="20" height="16" x="2" y="4" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+              <input id="email" name="email" type="email" placeholder="seu@ifpe.edu.br" />
+            </div>
+          </div>
+
+          <div class="field" id="matricula-field">
+            <label for="matricula">Matrícula</label>
+            <div class="input-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 5h16v14H4z" />
+                <path d="M8 9h8M8 13h5" />
+              </svg>
+              <input id="matricula" name="matricula" placeholder="Sua matrícula" />
+            </div>
+          </div>
+
+          <div class="field" id="specific-field">
+            <label for="curso" id="specific-label">Curso</label>
+            <div class="input-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                <path d="M6 12v5c3 3 9 3 12 0v-5" />
+              </svg>
+              <input id="specific-input" name="curso" placeholder="Seu curso" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="password">Senha</label>
+            <div class="input-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="18" height="11" x="3" y="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input id="password" name="password" type="password" placeholder="••••••••" />
+            </div>
+          </div>
+
+          <div class="field">
+            <span>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                <path d="M6 12v5c3 3 9 3 12 0v-5" />
+              </svg>
+              Tipo de usuário
+            </span>
+            <div class="roles">
+              <label class="role">
+                <input type="radio" name="role" value="Discente" checked />
+                Discente
+              </label>
+              <label class="role">
+                <input type="radio" name="role" value="Docente" />
+                Docente
+              </label>
+              <label class="role">
+                <input type="radio" name="role" value="Servidor" />
+                Servidor
+              </label>
+            </div>
+          </div>
+
+          <button class="btn" type="submit">Cadastrar</button>
+          <p class="switch-auth">Já tem conta? <a href="index.html">Entrar</a></p>
+        </form>
+      </main>
+    </div>
+    <script>
+      const roleFields = {
+        Discente: { label: 'Curso', name: 'curso', placeholder: 'Seu curso' },
+        Docente: { label: 'Número da CNDB', name: 'CNDB', placeholder: 'Número da CNDB' },
+        Servidor: { label: 'CPF', name: 'cpf', placeholder: 'Seu CPF' },
+      };
+
+      const roleInputs = document.querySelectorAll('input[name="role"]');
+      const matriculaField = document.getElementById('matricula-field');
+      const matriculaInput = document.getElementById('matricula');
+      const specificLabel = document.getElementById('specific-label');
+      const specificInput = document.getElementById('specific-input');
+
+      function updateRoleField(role) {
+        const field = roleFields[role];
+        const isDiscente = role === 'Discente';
+        matriculaField.hidden = !isDiscente;
+        matriculaInput.required = isDiscente;
+        if (!isDiscente) matriculaInput.value = '';
+        specificLabel.textContent = field.label;
+        specificInput.name = field.name;
+        specificInput.id = field.name;
+        specificInput.placeholder = field.placeholder;
+      }
+
+      roleInputs.forEach((input) => {
+        input.addEventListener('change', () => updateRoleField(input.value));
+      });
+    </script>
+  </body>
+</html>
