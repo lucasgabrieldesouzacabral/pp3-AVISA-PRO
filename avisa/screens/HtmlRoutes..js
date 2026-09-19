@@ -13,8 +13,14 @@ const pages = {
 const stylesheet = require('../Telas/css/styles.css');
 
 function addBridge(html, css, route, user) {
+  const profileData = JSON.stringify({
+    id_usuario: user?.id_usuario || null,
+    interesses: user?.interesses || [],
+  });
   const bridge = `
     <script>
+      window.__AVISA_PROFILE__ = ${profileData};
+
       document.addEventListener('click', function (event) {
         const link = event.target.closest('a');
         if (!link || !link.getAttribute('href')) return;
@@ -55,11 +61,19 @@ function addBridge(html, css, route, user) {
     .map((name) => name[0])
     .join('')
     .toUpperCase();
+  const specificField = currentUser.tipo_usuario === 'Docente'
+    ? { label: 'CNDB', value: currentUser.CNDB }
+    : currentUser.tipo_usuario === 'Servidor'
+      ? { label: 'CPF', value: currentUser.cpf }
+      : { label: 'Curso', value: currentUser.curso };
   const personalizedPage = pageWithoutExternalStylesheet
     .replaceAll('{{NOME_USUARIO}}', currentUser.nome_completo || 'Usuário')
     .replaceAll('{{EMAIL_USUARIO}}', currentUser.email_institucional || '')
     .replaceAll('{{MATRICULA_USUARIO}}', currentUser.matricula || '')
     .replaceAll('{{CURSO_USUARIO}}', currentUser.curso || '')
+    .replaceAll('{{TIPO_USUARIO}}', currentUser.tipo_usuario || '')
+    .replaceAll('{{DADO_ESPECIFICO_ROTULO}}', specificField.label)
+    .replaceAll('{{DADO_ESPECIFICO}}', specificField.value || '')
     .replaceAll('{{INICIAIS_USUARIO}}', initials);
 
   return personalizedPage.replace('</head>', `<style>${css}</style>${bridge}</head>`);

@@ -4,44 +4,312 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Perfil — AVISA</title>
+    <link rel="icon" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;1,9..144,700&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
         <a class="logo" href="inicio.html" aria-label="AVISA">
-          <span class="logo-mark">!</span>
+          <span class="logo-mark">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+          </span>
           <span class="logo-word">avisa<span>!</span></span>
         </a>
-        <nav class="nav" aria-label="Navegação principal">
-          <a href="inicio.html">Início</a>
-          <a class="active" href="perfil.html">Perfil</a>
-          <a href="index.html">Sair</a>
+        <nav class="nav">
+          <a href="inicio.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+            Início
+          </a>
+          <a href="calendario.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
+            Calendário
+          </a>
+          <a href="notificacoes.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+            Notificações
+          </a>
+          <a href="criar-evento.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M8 12h8" /><path d="M12 8v8" /></svg>
+            Criar Evento
+          </a>
+          <a class="active" href="perfil.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+            Perfil
+          </a>
         </nav>
+        <div class="sidebar-foot">
+          <div class="user-chip">
+            <div class="avatar">{{INICIAIS_USUARIO}}</div>
+            <div><strong>{{NOME_USUARIO}}</strong><small>{{TIPO_USUARIO}}</small></div>
+          </div>
+          <a class="logout" href="index.html">Sair</a>
+        </div>
       </aside>
-
       <main class="main">
         <header class="page-head">
           <div>
-            <h1>Meu perfil</h1>
-            <p>Confira seus dados cadastrados no AVISA.</p>
+            <h1>Perfil</h1>
+            <p>Visualize seus dados, interesses e preferências acadêmicas.</p>
           </div>
+          <button class="btn cta" type="button">
+            Editar perfil
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
         </header>
 
-        <section class="profile-detail">
-          <div class="avatar profile-avatar">{{INICIAIS_USUARIO}}</div>
-          <div>
-            <h2>{{NOME_USUARIO}}</h2>
-            <p>Discente</p>
-          </div>
-          <dl class="profile-fields">
-            <div><dt>E-mail institucional</dt><dd>{{EMAIL_USUARIO}}</dd></div>
-            <div><dt>Matrícula</dt><dd>{{MATRICULA_USUARIO}}</dd></div>
-            <div><dt>Curso</dt><dd>{{CURSO_USUARIO}}</dd></div>
-          </dl>
-          <a class="btn profile-action" href="inicio.html">Voltar para eventos</a>
-        </section>
+        <div class="profile-grid">
+          <section class="profile-card profile-hero">
+            <div class="profile-header">
+              <div class="profile-avatar">{{INICIAIS_USUARIO}}</div>
+              <div class="profile-meta">
+                <span class="eyebrow">{{TIPO_USUARIO}}</span>
+                <h2>{{NOME_USUARIO}}</h2>
+                <p>{{EMAIL_USUARIO}}</p>
+              </div>
+            </div>
+
+            <div class="profile-stats">
+              <div class="stat-item">
+                <strong>14</strong>
+                <span>Eventos</span>
+              </div>
+              <div class="stat-item">
+                <strong>06</strong>
+                <span>Participações</span>
+              </div>
+              <div class="stat-item">
+                <strong>03</strong>
+                <span>Inscrições</span>
+              </div>
+            </div>
+          </section>
+
+          <aside class="profile-side">
+            <section class="profile-card">
+              <h3>Dados pessoais</h3>
+              <ul class="info-list">
+                <li>
+                  <span>{{DADO_ESPECIFICO_ROTULO}}</span>
+                  <strong>{{DADO_ESPECIFICO}}</strong>
+                </li>
+                <li>
+                  <span>Tipo de usuário</span>
+                  <strong>{{TIPO_USUARIO}}</strong>
+                </li>
+                <li>
+                  <span>E-mail institucional</span>
+                  <strong>{{EMAIL_USUARIO}}</strong>
+                </li>
+              </ul>
+            </section>
+
+            <section class="profile-card">
+              <h3>Preferências</h3>
+              <div class="toggle-list">
+                <div class="toggle-row">
+                  <span>Novos eventos</span>
+                  <label class="switch">
+                    <input type="checkbox" checked />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="toggle-row">
+                  <span>Lembretes por e-mail</span>
+                  <label class="switch">
+                    <input type="checkbox" checked />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="toggle-row">
+                  <span>Notificações da agenda</span>
+                  <label class="switch">
+                    <input type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+            </section>
+          </aside>
+
+          <section class="profile-card span-two">
+            <div class="card-header">
+              <h3>Interesses acadêmicos</h3>
+              <button class="interest-add-btn" type="button" aria-label="Adicionar interesse" aria-expanded="false" aria-controls="interest-modal">
+                +
+              </button>
+            </div>
+
+            <div id="interest-modal" class="interest-modal hidden" role="dialog" aria-modal="true" aria-labelledby="interest-modal-title">
+              <div class="interest-modal-card">
+                <div class="modal-header">
+                  <h4 id="interest-modal-title">Selecionar interesses</h4>
+                  <button class="close-modal" type="button" aria-label="Fechar">×</button>
+                </div>
+                <p class="modal-tip">Você pode escolher até 8 áreas de estudo.</p>
+                <div class="interest-options">
+                  <label class="interest-option"><input type="checkbox" value="Desenvolvimento Web" /><span>Desenvolvimento Web</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Inovação" /><span>Inovação</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Banco de Dados" /><span>Banco de Dados</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Redes de Computadores" /><span>Redes de Computadores</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Ciências Naturais" /><span>Ciências Naturais</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Política" /><span>Política</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Filosofia" /><span>Filosofia</span></label>
+                  <label class="interest-option"><input type="checkbox" value="História" /><span>História</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Sociologia" /><span>Sociologia</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Física" /><span>Física</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Ciências Humanas" /><span>Ciências Humanas</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Arte" /><span>Arte</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Química" /><span>Química</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Geografia" /><span>Geografia</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Línguas Estrangeiras" /><span>Línguas Estrangeiras</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Língua Portuguesa" /><span>Língua Portuguesa</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Empreendedorismo" /><span>Empreendedorismo</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Matemática" /><span>Matemática</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Literatura" /><span>Literatura</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Música" /><span>Música</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Jogos" /><span>Jogos</span></label>
+                  <label class="interest-option"><input type="checkbox" value="Cinema" /><span>Cinema</span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="tag-list" id="tag-list">
+              <span>Desenvolvimento Web</span>
+              <span>Inovação</span>
+              <span>Banco de Dados</span>
+              <span>Redes de Computadores</span>
+            </div>
+          </section>
+
+          <section class="profile-card span-two">
+            <h3>Histórico recente</h3>
+            <div class="timeline">
+              <div class="timeline-item">
+                <span class="dot"></span>
+                <div>
+                  <strong>Semana de Tecnologia 2026</strong>
+                  <p>Você confirmou sua presença.</p>
+                </div>
+                <time>15 Abr</time>
+              </div>
+              <div class="timeline-item">
+                <span class="dot"></span>
+                <div>
+                  <strong>Workshop de React &amp; TypeScript</strong>
+                  <p>Inscrição realizada com sucesso.</p>
+                </div>
+                <time>18 Abr</time>
+              </div>
+              <div class="timeline-item">
+                <span class="dot"></span>
+                <div>
+                  <strong>Hackathon de Impacto Social</strong>
+                  <p>Você foi selecionado para a equipe de design.</p>
+                </div>
+                <time>26 Abr</time>
+              </div>
+            </div>
+          </section>
+        </div>
       </main>
     </div>
+
+    <script>
+      const modal = document.getElementById('interest-modal');
+      const addButton = document.querySelector('.interest-add-btn');
+      const closeButton = document.querySelector('.close-modal');
+      const interestChecks = Array.from(document.querySelectorAll('.interest-option input'));
+      const tagList = document.getElementById('tag-list');
+      const maxSelected = 8;
+
+      function saveInterests() {
+        const interests = interestChecks.filter((input) => input.checked).map((input) => input.value);
+        const message = JSON.stringify({ type: 'updateInterests', interests });
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
+        else window.parent.postMessage(message, '*');
+      }
+
+      function syncTags() {
+        const selected = interestChecks.filter((input) => input.checked).map((input) => input.value);
+        const tags = selected.length ? selected : ['Nenhum interesse selecionado'];
+
+        tagList.innerHTML = tags
+          .map((tag) => `<span>${tag}</span>`)
+          .join('');
+      }
+
+      function updateCheckboxAvailability() {
+        const selectedCount = interestChecks.filter((input) => input.checked).length;
+
+        interestChecks.forEach((input) => {
+          if (!input.checked && selectedCount >= maxSelected) {
+            input.disabled = true;
+          } else {
+            input.disabled = false;
+          }
+        });
+      }
+
+      function openModal() {
+        modal.classList.remove('hidden');
+        addButton.setAttribute('aria-expanded', 'true');
+      }
+
+      function closeModal() {
+        modal.classList.add('hidden');
+        addButton.setAttribute('aria-expanded', 'false');
+      }
+
+      addButton.addEventListener('click', () => {
+        const isHidden = modal.classList.contains('hidden');
+        if (isHidden) {
+          openModal();
+        } else {
+          closeModal();
+        }
+      });
+
+      closeButton.addEventListener('click', closeModal);
+
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+          closeModal();
+        }
+      });
+
+      interestChecks.forEach((input) => {
+        input.addEventListener('change', () => {
+          const selectedCount = interestChecks.filter((item) => item.checked).length;
+
+          if (selectedCount > maxSelected) {
+            input.checked = false;
+          }
+
+          updateCheckboxAvailability();
+          syncTags();
+          saveInterests();
+        });
+      });
+
+      const savedInterests = (window.__AVISA_PROFILE__ && window.__AVISA_PROFILE__.interesses) || [];
+      interestChecks.forEach((input) => {
+        input.checked = savedInterests.includes(input.value);
+      });
+      updateCheckboxAvailability();
+      syncTags();
+    </script>
   </body>
 </html>

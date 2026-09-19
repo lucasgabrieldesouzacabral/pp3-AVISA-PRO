@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 let db;
 const WEB_USERS_KEY = 'meuavisa.usuarios';
+const WEB_INTERESTS_KEY = 'meuavisa.interesses';
 
 function getDatabase() {
   if (Platform.OS === 'web') {
@@ -107,6 +108,13 @@ export function initDatabase() {
       data_envio TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       lida INTEGER NOT NULL DEFAULT 0 CHECK (lida IN (0, 1)),
       FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario)
+    );
+
+    CREATE TABLE IF NOT EXISTS usuario_interesses (
+      id_usuario INTEGER NOT NULL,
+      interesse TEXT NOT NULL,
+      PRIMARY KEY (id_usuario, interesse),
+      FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE CASCADE
     );
   `);
 }
@@ -236,7 +244,25 @@ export function registerDiscente(payload) {
   return registerUser({ ...payload, tipo_usuario: 'Discente' });
 }
 
+export function registerDocente(payload) {
+  return registerUser({ ...payload, tipo_usuario: 'Docente' });
+}
+
+export function registerServidor(payload) {
+  return registerUser({ ...payload, tipo_usuario: 'Servidor' });
+}
+
 export function loginDiscente(email_institucional, senha) {
+  const usuario = loginUser(email_institucional, senha);
+
+  if (usuario.tipo_usuario !== 'Discente') {
+    throw new Error('O usuário encontrado não é um discente válido.');
+  }
+
+  return usuario;
+}
+
+export function loginUser(email_institucional, senha) {
   const email = String(email_institucional || '').trim().toLowerCase();
   const password = String(senha || '').trim();
 
@@ -253,15 +279,14 @@ export function loginDiscente(email_institucional, senha) {
       throw new Error('Credenciais inválidas.');
     }
 
-    return usuario;
+    return { ...usuario, interesses: getWebInterests(usuario.id_usuario) };
   }
 
   const database = getDatabase();
   const usuario = database.getFirstSync(
     `SELECT u.*
      FROM usuarios u
-     LEFT JOIN discentes d ON d.id_usuario = u.id_usuario
-     WHERE u.email_institucional = ? AND u.senha = ? AND u.tipo_usuario = 'Discente'`,
+     WHERE u.email_institucional = ? AND u.senha = ?`,
     [email, password]
   );
 
@@ -269,13 +294,23 @@ export function loginDiscente(email_institucional, senha) {
     throw new Error('Credenciais inválidas.');
   }
 
-  const discente = database.getFirstSync(
-    'SELECT id_usuario, curso FROM discentes WHERE id_usuario = ?',
+  const specificTable = usuario.tipo_usuario === 'Discente'
+    ? 'discentes'
+    : usuario.tipo_usuario === 'Docente'
+      ? 'docentes'
+      : 'servidores';
+  const specificColumn = usuario.tipo_usuario === 'Discente'
+    ? 'curso'
+    : usuario.tipo_usuario === 'Docente'
+      ? 'CNDB'
+      : 'cpf';
+  const specificData = database.getFirstSync(
+    `SELECT ${specificColumn} FROM ${specificTable} WHERE id_usuario = ?`,
     [usuario.id_usuario]
   );
 
-  if (!discente) {
-    throw new Error('O usuário encontrado não é um discente válido.');
+  if (!specificData) {
+    throw new Error('Os dados específicos do usuário não foram encontrados.');
   }
 
   return {
@@ -284,8 +319,46 @@ export function loginDiscente(email_institucional, senha) {
     email_institucional: usuario.email_institucional,
     matricula: usuario.matricula,
     tipo_usuario: usuario.tipo_usuario,
-    curso: discente.curso,
+    [specificColumn]: specificData[specificColumn],
+    interesses: getUserInterests(usuario.id_usuario),
   };
+}
+
+function getWebInterests(id_usuario) {
+  const interests = JSON.parse(window.localStorage.getItem(WEB_INTERESTS_KEY) || '{}');
+  return interests[String(id_usuario)] || [];
+}
+
+export function getUserInterests(id_usuario) {
+  if (Platform.OS === 'web') return getWebInterests(id_usuario);
+
+  return getDatabase()
+    .getAllSync('SELECT interesse FROM usuario_interesses WHERE id_usuario = ? ORDER BY interesse', [id_usuario])
+    .map((row) => row.interesse);
+}
+
+export function updateUserInterests(id_usuario, interests) {
+  const normalized = [...new Set((interests || []).map((interest) => String(interest).trim()).filter(Boolean))].slice(0, 8);
+
+  if (Platform.OS === 'web') {
+    const stored = JSON.parse(window.localStorage.getItem(WEB_INTERESTS_KEY) || '{}');
+    stored[String(id_usuario)] = normalized;
+    window.localStorage.setItem(WEB_INTERESTS_KEY, JSON.stringify(stored));
+    return normalized;
+  }
+
+  const database = getDatabase();
+  database.withTransactionSync(() => {
+    database.runSync('DELETE FROM usuario_interesses WHERE id_usuario = ?', [id_usuario]);
+    normalized.forEach((interest) => {
+      database.runSync(
+        'INSERT INTO usuario_interesses (id_usuario, interesse) VALUES (?, ?)',
+        [id_usuario, interest]
+      );
+    });
+  });
+
+  return normalized;
 }
 
 export function getDiscenteById(id_usuario) {
@@ -296,6 +369,38 @@ export function getDiscenteById(id_usuario) {
      WHERE u.id_usuario = ?`,
     [id_usuario]
   );
+}
+
+export function getUserById(id_usuario) {
+  if (Platform.OS === 'web') {
+    const user = getWebUsers().find((item) => item.id_usuario === Number(id_usuario));
+    return user ? { ...user, interesses: getWebInterests(user.id_usuario) } : null;
+  }
+
+  const database = getDatabase();
+  const usuario = database.getFirstSync(
+    'SELECT id_usuario, nome_completo, email_institucional, matricula, tipo_usuario FROM usuarios WHERE id_usuario = ?',
+    [id_usuario]
+  );
+
+  if (!usuario) return null;
+
+  const specificTable = usuario.tipo_usuario === 'Discente'
+    ? 'discentes'
+    : usuario.tipo_usuario === 'Docente'
+      ? 'docentes'
+      : 'servidores';
+  const specificColumn = usuario.tipo_usuario === 'Discente'
+    ? 'curso'
+    : usuario.tipo_usuario === 'Docente'
+      ? 'CNDB'
+      : 'cpf';
+  const specificData = database.getFirstSync(
+    `SELECT ${specificColumn} FROM ${specificTable} WHERE id_usuario = ?`,
+    [id_usuario]
+  );
+
+  return { ...usuario, ...(specificData || {}), interesses: getUserInterests(id_usuario) };
 }
 
 export default { getDatabase };

@@ -31,7 +31,7 @@ export default function App() {
       }
 
       if (data.type === 'login') {
-        const usuario = discenteAuthRoutes.login(data.email, data.password);
+        const usuario = discenteAuthRoutes.loginUser(data.email, data.password);
         setUser(usuario);
         setRoute('inicio');
         Alert.alert('Login realizado', `Bem-vindo(a), ${usuario.nome_completo}.`);
@@ -52,6 +52,13 @@ export default function App() {
 
         setRoute('login');
         Alert.alert('Cadastro realizado', `${usuario.tipo_usuario} cadastrado: ${usuario.nome_completo}`);
+        return;
+      }
+
+      if (data.type === 'updateInterests') {
+        if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
+        const interesses = discenteAuthRoutes.updateUserInterests(user.id_usuario, data.interests);
+        setUser((currentUser) => ({ ...currentUser, interesses }));
       }
     } catch (error) {
       Alert.alert('Não foi possível concluir', error.message);
