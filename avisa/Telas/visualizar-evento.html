@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Evento — AVISA</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="logo" href="inicio.html" aria-label="AVISA">
+          <span class="logo-mark">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+          </span>
+          <span class="logo-word">avisa<span>!</span></span>
+        </a>
+        <nav class="nav">
+          <a href="inicio.html">Início</a>
+          <a href="calendario.html">Calendário</a>
+          <a href="notificacoes.html">Notificações</a>
+          <a href="criar-evento.html">Criar Evento</a>
+          <a href="perfil.html">Perfil</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="page-head">
+          <div>
+            <p>Visualização temporária</p>
+            <h1>{{EVENT_TITLE}}</h1>
+          </div>
+          <a class="btn btn-secondary" href="inicio.html">Voltar aos eventos</a>
+        </header>
+
+        <section class="profile-card event-preview">
+          <span class="badge {{EVENT_STATUS_CLASS}}">{{EVENT_STATUS}}</span>
+          <h2>Sobre o evento</h2>
+          <p>{{EVENT_DESCRIPTION}}</p>
+
+          <h2>Informações armazenadas</h2>
+          <ul class="info-list">
+            <li><span>Identificador</span><strong>{{EVENT_ID}}</strong></li>
+            <li><span>Data</span><strong>{{EVENT_DATE}}</strong></li>
+            <li><span>Horário</span><strong>{{EVENT_TIME}}</strong></li>
+            <li><span>Local</span><strong>{{EVENT_LOCATION}}</strong></li>
+            <li><span>Vagas disponíveis</span><strong>{{EVENT_SPOTS}}</strong></li>
+            <li><span>Suporte de terceiros</span><strong>{{EVENT_SUPPORT}}</strong></li>
+            <li><span>Tipo de colaboração</span><strong>{{EVENT_SUPPORT_DETAILS}}</strong></li>
+            <li><span>Organizador</span><strong>{{EVENT_ORGANIZER}}</strong></li>
+            <li><span>Criado em</span><strong>{{EVENT_CREATED_AT}}</strong></li>
+          </ul>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

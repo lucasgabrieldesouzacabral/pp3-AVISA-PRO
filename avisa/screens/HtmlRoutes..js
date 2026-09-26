@@ -12,6 +12,7 @@ const pages = {
   notificacoes: require('../Telas/notificacoes.html'),
   'criar-evento': require('../Telas/criar-evento.html'),
   perfil: require('../Telas/perfil.html'),
+  'visualizar-evento': require('../Telas/visualizar-evento.html'),
 };
 
 const stylesheet = require('../Telas/css/styles.css');
@@ -40,12 +41,14 @@ function escapeHtml(value) {
 function renderEvents(events) {
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
+  if (!events.length) return '<p class="event-empty">Ainda não há eventos armazenados.</p>';
+
   return events.map((event) => {
     const [year, month, day] = event.data_evento.split('-');
     const monthName = months[Number(month) - 1] || month;
     const statusClass = event.status === 'Pendente' ? 'badge pending' : 'badge';
 
-    return `<article class="event-card">
+    return `<article class="event-card stored-event" data-event-id="${escapeHtml(event.id_evento)}" role="button" tabindex="0" aria-label="Visualizar ${escapeHtml(event.titulo)}">
       <div class="date-chip"><strong>${escapeHtml(day)}</strong><span>${escapeHtml(monthName)}</span></div>
       <div>
         <div class="event-top"><h2>${escapeHtml(event.titulo)}</h2><span class="${statusClass}">${escapeHtml(event.status)}</span></div>
@@ -83,7 +86,12 @@ function renderRecentHistory(events, user) {
   }).join('');
 }
 
-function addBridge(html, css, route, user, events) {
+function formatDate(value) {
+  const dateParts = String(value || '').split(/[T ]/)[0].split('-');
+  return dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : 'Não informado';
+}
+
+function addBridge(html, css, route, user, events, selectedEvent) {
   const profileData = JSON.stringify({
     id_usuario: user?.id_usuario || null,
     interesses: user?.interesses || [],
@@ -91,6 +99,21 @@ function addBridge(html, css, route, user, events) {
   const bridge = `
     <script>
       window.__AVISA_PROFILE__ = ${profileData};
+
+      document.addEventListener('click', function (event) {
+        const eventCard = event.target.closest('[data-event-id]');
+        if (!eventCard) return;
+        const message = JSON.stringify({ type: 'viewEvent', id_evento: Number(eventCard.dataset.eventId) });
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
+        else window.parent.postMessage(message, '*');
+      });
+
+      document.addEventListener('keydown', function (event) {
+        const eventCard = event.target.closest('[data-event-id]');
+        if (!eventCard || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        eventCard.click();
+      });
 
       document.addEventListener('click', function (event) {
         const link = event.target.closest('a');
@@ -147,9 +170,30 @@ function addBridge(html, css, route, user, events) {
     .replaceAll('{{DADO_ESPECIFICO}}', specificField.value || '')
     .replaceAll('{{INICIAIS_USUARIO}}', initials);
 
-  const pageWithEvents = route === 'inicio'
-    ? personalizedPage.replace('<section class="event-list">', `<section class="event-list">${renderEvents(events)}`)
+  const supportNeeded = Number(selectedEvent?.suporte_terceiros) === 1;
+  const pageWithEventDetails = route === 'visualizar-evento' && selectedEvent
+    ? personalizedPage
+      .replaceAll('{{EVENT_TITLE}}', escapeHtml(selectedEvent.titulo))
+      .replaceAll('{{EVENT_STATUS_CLASS}}', selectedEvent.status === 'Pendente' ? 'pending' : '')
+      .replaceAll('{{EVENT_STATUS}}', escapeHtml(selectedEvent.status))
+      .replaceAll('{{EVENT_DESCRIPTION}}', escapeHtml(selectedEvent.descricao))
+      .replaceAll('{{EVENT_ID}}', escapeHtml(selectedEvent.id_evento))
+      .replaceAll('{{EVENT_DATE}}', escapeHtml(formatDate(selectedEvent.data_evento)))
+      .replaceAll('{{EVENT_TIME}}', escapeHtml(selectedEvent.horario))
+      .replaceAll('{{EVENT_LOCATION}}', escapeHtml(selectedEvent.local))
+      .replaceAll('{{EVENT_SPOTS}}', escapeHtml(selectedEvent.vagas_disponiveis))
+      .replaceAll('{{EVENT_SUPPORT}}', supportNeeded ? 'Sim' : 'Não')
+      .replaceAll('{{EVENT_SUPPORT_DETAILS}}', escapeHtml(selectedEvent.suporte_detalhes || 'Não informado'))
+      .replaceAll('{{EVENT_ORGANIZER}}', escapeHtml(selectedEvent.nome_organizador || 'Não informado'))
+      .replaceAll('{{EVENT_CREATED_AT}}', escapeHtml(formatDate(selectedEvent.data_criacao)))
     : personalizedPage;
+
+  const pageWithEvents = route === 'inicio'
+    ? pageWithEventDetails.replace(
+      /<section class="event-list">[\s\S]*?<\/section>/,
+      `<section class="event-list">${renderEvents(events)}</section>`
+    )
+    : pageWithEventDetails;
   const pageWithHistory = route === 'perfil'
     ? pageWithEvents.replace('<div class="timeline">', `<div class="timeline">${renderRecentHistory(events, user)}`)
     : pageWithEvents;
@@ -157,7 +201,7 @@ function addBridge(html, css, route, user, events) {
   return pageWithHistory.replace('</head>', `<style>${css}</style>${bridge}</head>`);
 }
 
-export default function HtmlRoute({ route, user, events, onMessage }) {
+export default function HtmlRoute({ route, user, events, selectedEvent, onMessage }) {
   const [html, setHtml] = useState('');
   const [loadError, setLoadError] = useState('');
 
@@ -177,7 +221,7 @@ export default function HtmlRoute({ route, user, events, onMessage }) {
           readAssetText(stylesheetAsset[0]),
         ]);
 
-        if (active) setHtml(addBridge(pageContent, css, route, user, events || []));
+        if (active) setHtml(addBridge(pageContent, css, route, user, events || [], selectedEvent));
       } catch (error) {
         if (active) setLoadError(error?.message || 'Não foi possível carregar esta tela.');
       }
@@ -187,7 +231,7 @@ export default function HtmlRoute({ route, user, events, onMessage }) {
     return () => {
       active = false;
     };
-  }, [route, user, events]);
+  }, [route, user, events, selectedEvent]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;

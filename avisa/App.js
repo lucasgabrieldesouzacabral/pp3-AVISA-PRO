@@ -8,6 +8,7 @@ export default function App() {
   const [route, setRoute] = useState('login');
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
     discenteAuthRoutes.init();
@@ -30,6 +31,14 @@ export default function App() {
         const nextRoute = routes[data.route] || 'login';
         if (nextRoute === 'login') setUser(null);
         setRoute(nextRoute);
+        return;
+      }
+
+      if (data.type === 'viewEvent') {
+        const selected = events.find((event) => Number(event.id_evento) === Number(data.id_evento));
+        if (!selected) throw new Error('Não foi possível localizar este evento salvo.');
+        setSelectedEvent(selected);
+        setRoute('visualizar-evento');
         return;
       }
 
@@ -78,7 +87,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <HtmlRoute route={route} user={user} events={events} onMessage={handleMessage} />
+      <HtmlRoute route={route} user={user} events={events} selectedEvent={selectedEvent} onMessage={handleMessage} />
     </View>
   );
 }
