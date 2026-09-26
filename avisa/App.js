@@ -22,6 +22,10 @@ export default function App() {
             ? 'cadastro'
             : data.route === 'inicio.html'
               ? 'inicio'
+              : data.route === 'calendario.html'
+                ? 'calendario'
+                : data.route === 'notificacoes.html'
+                  ? 'notificacoes'
               : data.route === 'perfil.html'
                 ? 'perfil'
                 : 'login';

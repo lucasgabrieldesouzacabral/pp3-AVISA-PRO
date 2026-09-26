@@ -8,6 +8,8 @@ const pages = {
   login: require('../Telas/index.html'),
   cadastro: require('../Telas/cadastro.html'),
   inicio: require('../Telas/inicio.html'),
+  calendario: require('../Telas/calendario.html'),
+  notificacoes: require('../Telas/notificacoes.html'),
   perfil: require('../Telas/perfil.html'),
 };
 
@@ -37,7 +39,7 @@ function addBridge(html, css, route, user) {
         const link = event.target.closest('a');
         if (!link || !link.getAttribute('href')) return;
         const href = link.getAttribute('href');
-        if (href === 'index.html' || href === 'cadastro.html' || href === 'inicio.html' || href === 'perfil.html') {
+        if (href === 'index.html' || href === 'cadastro.html' || href === 'inicio.html' || href === 'calendario.html' || href === 'notificacoes.html' || href === 'perfil.html') {
           event.preventDefault();
           const message = JSON.stringify({ type: 'route', route: href });
           if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);

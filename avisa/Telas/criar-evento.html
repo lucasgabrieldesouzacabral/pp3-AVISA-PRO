@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Criar evento — AVISA</title>
+    <link rel="icon" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;1,9..144,700&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="logo" href="inicio.html" aria-label="AVISA">
+          <span class="logo-mark">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+          </span>
+          <span class="logo-word">AVISA<span>!</span></span>
+        </a>
+        <nav class="nav">
+          <a href="inicio.html">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            Início
+          </a>
+          <a href="calendario.html">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect width="18" height="18" x="3" y="4" rx="2" />
+              <line x1="16" x2="16" y1="2" y2="6" />
+              <line x1="8" x2="8" y1="2" y2="6" />
+              <line x1="3" x2="21" y1="10" y2="10" />
+            </svg>
+            Calendário
+          </a>
+          <a href="notificacoes.html">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+            Notificações
+          </a>
+          <a class="active" href="criar-evento.html">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 12h8" />
+              <path d="M12 8v8" />
+            </svg>
+            Criar Evento
+          </a>
+          <a href="perfil.html">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            Perfil
+          </a>
+        </nav>
+        <div class="sidebar-foot">
+          <div class="user-chip">
+            <div class="avatar">AS</div>
+            <div><strong>Ana Souza</strong><small>Discente</small></div>
+          </div>
+          <a class="logout" href="index.html">Sair</a>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="page-head">
+          <div>
+            <h1>Criar evento</h1>
+            <p>Preencha os dados do evento acadêmico</p>
+          </div>
+        </header>
+        <form class="event-form" data-event-form>
+          <div class="field event-field">
+            <label for="event-title">Título do evento</label>
+            <input
+              id="event-title"
+              name="title"
+              type="text"
+              placeholder="Ex: Workshop de Inteligência Artificial"
+              required
+            />
+          </div>
+
+          <div class="field event-field">
+            <label for="event-description">Descrição</label>
+            <textarea
+              id="event-description"
+              name="description"
+              placeholder="Descreva o evento..."
+              rows="4"
+              required
+            ></textarea>
+          </div>
+
+          <div class="event-form-grid">
+            <div class="field event-field">
+              <label for="event-date">Data</label>
+              <input id="event-date" name="date" type="date" required />
+            </div>
+            <div class="field event-field">
+              <label for="event-time">Horário</label>
+              <input id="event-time" name="time" type="time" required />
+            </div>
+          </div>
+
+          <div class="field event-field">
+            <label for="event-location">Local</label>
+            <input
+              id="event-location"
+              name="location"
+              type="text"
+              placeholder="Ex: Auditório Principal"
+              required
+            />
+          </div>
+
+          <fieldset class="field event-field support-field">
+            <legend>Necessidade de suporte de terceiros</legend>
+            <div class="choice-grid">
+              <label class="choice support-choice">
+                <input type="radio" name="support" value="yes" required />
+                <span>Sim</span>
+              </label>
+              <label class="choice support-choice">
+                <input type="radio" name="support" value="no" />
+                <span>Não</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div id="support-details-wrap" class="field event-field hidden-support-details">
+            <label for="support-details">Tipo de colaboração necessária</label>
+            <textarea
+              id="support-details"
+              name="supportDetails"
+              rows="3"
+              placeholder="Descreva o tipo de colaboração, ajuda ou apoio que o evento precisa..."
+            ></textarea>
+          </div>
+
+          <div class="field event-field">
+            <label for="event-spots">Vagas disponíveis</label>
+            <input id="event-spots" name="spots" type="number" min="1" placeholder="50" required />
+          </div>
+
+          <div class="event-actions">
+            <a class="btn btn-secondary" href="inicio.html">Cancelar</a>
+            <button class="btn" type="submit">Publicar Evento</button>
+          </div>
+        </form>
+      </main>
+    </div>
+    <script src="js/eventos.js"></script>
+    <script>
+      const supportFields = document.querySelectorAll('input[name="support"]');
+      const supportDetailsWrap = document.getElementById('support-details-wrap');
+      const supportDetailsInput = document.getElementById('support-details');
+
+      function toggleSupportDetails() {
+        const checkedValue = document.querySelector('input[name="support"]:checked')?.value;
+
+        if (checkedValue === 'yes') {
+          supportDetailsWrap.classList.add('visible');
+          supportDetailsInput.setAttribute('required', 'required');
+        } else {
+          supportDetailsWrap.classList.remove('visible');
+          supportDetailsInput.removeAttribute('required');
+          supportDetailsInput.value = '';
+        }
+      }
+
+      supportFields.forEach((field) => {
+        field.addEventListener('change', toggleSupportDetails);
+      });
+    </script>
+  </body>
+</html>
