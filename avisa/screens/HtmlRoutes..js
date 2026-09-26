@@ -10,6 +10,7 @@ const pages = {
   inicio: require('../Telas/inicio.html'),
   calendario: require('../Telas/calendario.html'),
   notificacoes: require('../Telas/notificacoes.html'),
+  'criar-evento': require('../Telas/criar-evento.html'),
   perfil: require('../Telas/perfil.html'),
 };
 
@@ -26,7 +27,63 @@ async function readAssetText(asset) {
   return new File(asset.localUri).text();
 }
 
-function addBridge(html, css, route, user) {
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+}
+
+function renderEvents(events) {
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  return events.map((event) => {
+    const [year, month, day] = event.data_evento.split('-');
+    const monthName = months[Number(month) - 1] || month;
+    const statusClass = event.status === 'Pendente' ? 'badge pending' : 'badge';
+
+    return `<article class="event-card">
+      <div class="date-chip"><strong>${escapeHtml(day)}</strong><span>${escapeHtml(monthName)}</span></div>
+      <div>
+        <div class="event-top"><h2>${escapeHtml(event.titulo)}</h2><span class="${statusClass}">${escapeHtml(event.status)}</span></div>
+        <div class="meta">
+          <span>${escapeHtml(`${day} ${monthName} ${year} • ${event.horario}`)}</span>
+          <span>${escapeHtml(event.local)}</span>
+          <span>${escapeHtml(event.vagas_disponiveis)} vagas</span>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+function renderRecentHistory(events, user) {
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const userEvents = events
+    .filter((event) => Number(event.id_organizador_principal) === Number(user?.id_usuario))
+    .sort((first, second) => String(second.data_criacao || '').localeCompare(String(first.data_criacao || '')))
+    .slice(0, 10);
+
+  if (!userEvents.length) {
+    return '<p>Você ainda não criou eventos.</p>';
+  }
+
+  return userEvents.map((event) => {
+    const createdDate = String(event.data_criacao || event.data_evento).split(/[T ]/)[0];
+    const [year, month, day] = createdDate.split('-');
+    const dateLabel = `${day} ${months[Number(month) - 1] || ''}`.trim();
+
+    return `<div class="timeline-item">
+      <span class="dot"></span>
+      <div><strong>${escapeHtml(event.titulo)}</strong><p>Você criou este evento. Status: ${escapeHtml(event.status)}.</p></div>
+      <time>${escapeHtml(dateLabel)}</time>
+    </div>`;
+  }).join('');
+}
+
+function addBridge(html, css, route, user, events) {
   const profileData = JSON.stringify({
     id_usuario: user?.id_usuario || null,
     interesses: user?.interesses || [],
@@ -39,7 +96,7 @@ function addBridge(html, css, route, user) {
         const link = event.target.closest('a');
         if (!link || !link.getAttribute('href')) return;
         const href = link.getAttribute('href');
-        if (href === 'index.html' || href === 'cadastro.html' || href === 'inicio.html' || href === 'calendario.html' || href === 'notificacoes.html' || href === 'perfil.html') {
+        if (href === 'index.html' || href === 'cadastro.html' || href === 'inicio.html' || href === 'calendario.html' || href === 'notificacoes.html' || href === 'criar-evento.html' || href === 'perfil.html') {
           event.preventDefault();
           const message = JSON.stringify({ type: 'route', route: href });
           if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
@@ -52,7 +109,7 @@ function addBridge(html, css, route, user) {
         const form = new FormData(event.target);
         const data = Object.fromEntries(form.entries());
         const message = JSON.stringify({
-          type: '${route}' === 'cadastro' ? 'register' : 'login',
+          type: '${route}' === 'cadastro' ? 'register' : '${route}' === 'criar-evento' ? 'createEvent' : 'login',
           ...data,
           password: data.password
         });
@@ -90,10 +147,17 @@ function addBridge(html, css, route, user) {
     .replaceAll('{{DADO_ESPECIFICO}}', specificField.value || '')
     .replaceAll('{{INICIAIS_USUARIO}}', initials);
 
-  return personalizedPage.replace('</head>', `<style>${css}</style>${bridge}</head>`);
+  const pageWithEvents = route === 'inicio'
+    ? personalizedPage.replace('<section class="event-list">', `<section class="event-list">${renderEvents(events)}`)
+    : personalizedPage;
+  const pageWithHistory = route === 'perfil'
+    ? pageWithEvents.replace('<div class="timeline">', `<div class="timeline">${renderRecentHistory(events, user)}`)
+    : pageWithEvents;
+
+  return pageWithHistory.replace('</head>', `<style>${css}</style>${bridge}</head>`);
 }
 
-export default function HtmlRoute({ route, user, onMessage }) {
+export default function HtmlRoute({ route, user, events, onMessage }) {
   const [html, setHtml] = useState('');
   const [loadError, setLoadError] = useState('');
 
@@ -113,7 +177,7 @@ export default function HtmlRoute({ route, user, onMessage }) {
           readAssetText(stylesheetAsset[0]),
         ]);
 
-        if (active) setHtml(addBridge(pageContent, css, route, user));
+        if (active) setHtml(addBridge(pageContent, css, route, user, events || []));
       } catch (error) {
         if (active) setLoadError(error?.message || 'Não foi possível carregar esta tela.');
       }
@@ -123,7 +187,7 @@ export default function HtmlRoute({ route, user, onMessage }) {
     return () => {
       active = false;
     };
-  }, [route, user]);
+  }, [route, user, events]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;

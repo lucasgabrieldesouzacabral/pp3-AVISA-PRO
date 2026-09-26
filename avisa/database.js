@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 let db;
 const WEB_USERS_KEY = 'meuavisa.usuarios';
 const WEB_INTERESTS_KEY = 'meuavisa.interesses';
+const WEB_EVENTS_KEY = 'meuavisa.eventos';
 
 function getDatabase() {
   if (Platform.OS === 'web') {
@@ -70,8 +71,10 @@ export function initDatabase() {
       local TEXT NOT NULL,
       vagas_disponiveis INTEGER,
       suporte_terceiros INTEGER NOT NULL DEFAULT 0 CHECK (suporte_terceiros IN (0, 1)),
+      suporte_detalhes TEXT,
       status TEXT NOT NULL DEFAULT 'Pendente'
         CHECK (status IN ('Pendente', 'Confirmado', 'Cancelado', 'Adiado')),
+      data_criacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       id_organizador_principal INTEGER NOT NULL,
       FOREIGN KEY (id_organizador_principal) REFERENCES usuarios (id_usuario)
     );
@@ -117,6 +120,148 @@ export function initDatabase() {
       FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE CASCADE
     );
   `);
+
+  const eventColumns = getDatabase().getAllSync('PRAGMA table_info(eventos)');
+  if (!eventColumns.some((column) => column.name === 'suporte_detalhes')) {
+    getDatabase().execSync('ALTER TABLE eventos ADD COLUMN suporte_detalhes TEXT');
+  }
+  if (!eventColumns.some((column) => column.name === 'data_criacao')) {
+    getDatabase().execSync(`
+      ALTER TABLE eventos ADD COLUMN data_criacao TEXT;
+      UPDATE eventos SET data_criacao = CURRENT_TIMESTAMP WHERE data_criacao IS NULL;
+    `);
+  }
+}
+
+function normalizeEventPayload(payload) {
+  const support = String(payload.support || '').trim();
+  const spots = Number(payload.spots);
+  const normalized = {
+    titulo: String(payload.title || '').trim(),
+    descricao: String(payload.description || '').trim(),
+    data_evento: String(payload.date || '').trim(),
+    horario: String(payload.time || '').trim(),
+    local: String(payload.location || '').trim(),
+    suporte_terceiros: support === 'yes' ? 1 : support === 'no' ? 0 : null,
+    suporte_detalhes: String(payload.supportDetails || '').trim(),
+    vagas_disponiveis: spots,
+    id_organizador_principal: Number(payload.organizerId),
+  };
+
+  if (!normalized.titulo || !normalized.descricao || !normalized.local) {
+    throw new Error('Preencha o título, a descrição e o local do evento.');
+  }
+
+  const dateParts = normalized.data_evento.split('-').map(Number);
+  const validDate = dateParts.length === 3
+    && dateParts[0] > 0
+    && dateParts[1] >= 1
+    && dateParts[1] <= 12
+    && dateParts[2] >= 1
+    && dateParts[2] <= new Date(Date.UTC(dateParts[0], dateParts[1], 0)).getUTCDate();
+  if (!validDate) throw new Error('Informe uma data válida para o evento.');
+
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(normalized.horario)) {
+    throw new Error('Informe um horário válido para o evento.');
+  }
+
+  if (!Number.isSafeInteger(normalized.vagas_disponiveis) || normalized.vagas_disponiveis < 1) {
+    throw new Error('As vagas disponíveis devem ser um número inteiro maior que zero.');
+  }
+
+  if (normalized.suporte_terceiros === null) {
+    throw new Error('Informe se o evento precisa de suporte de terceiros.');
+  }
+
+  if (normalized.suporte_terceiros && !normalized.suporte_detalhes) {
+    throw new Error('Descreva o tipo de colaboração necessária.');
+  }
+
+  if (!Number.isSafeInteger(normalized.id_organizador_principal) || normalized.id_organizador_principal < 1) {
+    throw new Error('Entre na sua conta para publicar um evento.');
+  }
+
+  if (!normalized.suporte_terceiros) normalized.suporte_detalhes = '';
+  return normalized;
+}
+
+function getWebEvents() {
+  return JSON.parse(window.localStorage.getItem(WEB_EVENTS_KEY) || '[]');
+}
+
+export function createEvent(payload) {
+  const event = normalizeEventPayload(payload);
+
+  if (Platform.OS === 'web') {
+    const users = getWebUsers();
+    const organizer = users.find((user) => user.id_usuario === event.id_organizador_principal);
+    if (!organizer) throw new Error('O usuário organizador não foi encontrado.');
+
+    const events = getWebEvents();
+    const savedEvent = {
+      ...event,
+      id_evento: events.reduce((maxId, item) => Math.max(maxId, item.id_evento), 0) + 1,
+      status: 'Pendente',
+      data_criacao: new Date().toISOString(),
+      nome_organizador: organizer.nome_completo,
+    };
+    window.localStorage.setItem(WEB_EVENTS_KEY, JSON.stringify([savedEvent, ...events]));
+    return savedEvent;
+  }
+
+  const database = getDatabase();
+  const createdAt = new Date().toISOString();
+  const organizer = database.getFirstSync(
+    'SELECT id_usuario FROM usuarios WHERE id_usuario = ?',
+    [event.id_organizador_principal]
+  );
+  if (!organizer) throw new Error('O usuário organizador não foi encontrado.');
+
+  const result = database.runSync(
+    `INSERT INTO eventos (
+       titulo, descricao, data_evento, horario, local, vagas_disponiveis,
+       suporte_terceiros, suporte_detalhes, data_criacao, id_organizador_principal
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      event.titulo,
+      event.descricao,
+      event.data_evento,
+      event.horario,
+      event.local,
+      event.vagas_disponiveis,
+      event.suporte_terceiros,
+      event.suporte_detalhes || null,
+      createdAt,
+      event.id_organizador_principal,
+    ]
+  );
+
+  return database.getFirstSync(
+    `SELECT e.*, u.nome_completo AS nome_organizador
+     FROM eventos e
+     JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
+     WHERE e.id_evento = ?`,
+    [result.lastInsertRowId]
+  );
+}
+
+export function getEvents() {
+  if (Platform.OS === 'web') {
+    const users = getWebUsers();
+    return getWebEvents()
+      .map((event) => ({
+        ...event,
+        nome_organizador: users.find((user) => user.id_usuario === event.id_organizador_principal)?.nome_completo || '',
+      }))
+      .sort((first, second) => `${first.data_evento} ${first.horario}`.localeCompare(`${second.data_evento} ${second.horario}`));
+  }
+
+  return getDatabase().getAllSync(
+    `SELECT e.*, u.nome_completo AS nome_organizador
+     FROM eventos e
+     JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
+    ORDER BY e.data_evento, e.horario`
+  );
 }
 
 export function normalizeRegistrationPayload(payload) {

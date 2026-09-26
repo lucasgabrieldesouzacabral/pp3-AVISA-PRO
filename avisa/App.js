@@ -7,9 +7,11 @@ import HtmlRoute from './screens/HtmlRoutes..js';
 export default function App() {
   const [route, setRoute] = useState('login');
   const [user, setUser] = useState(null);
+  const [events, setEvents] = useState([]);
 
   useEffect(() => {
     discenteAuthRoutes.init();
+    setEvents(discenteAuthRoutes.getEvents());
   }, []);
 
   const handleMessage = (message) => {
@@ -17,18 +19,15 @@ export default function App() {
       const data = JSON.parse(message);
 
       if (data.type === 'route') {
-        const nextRoute =
-          data.route === 'cadastro.html'
-            ? 'cadastro'
-            : data.route === 'inicio.html'
-              ? 'inicio'
-              : data.route === 'calendario.html'
-                ? 'calendario'
-                : data.route === 'notificacoes.html'
-                  ? 'notificacoes'
-              : data.route === 'perfil.html'
-                ? 'perfil'
-                : 'login';
+        const routes = {
+          'cadastro.html': 'cadastro',
+          'inicio.html': 'inicio',
+          'calendario.html': 'calendario',
+          'notificacoes.html': 'notificacoes',
+          'criar-evento.html': 'criar-evento',
+          'perfil.html': 'perfil',
+        };
+        const nextRoute = routes[data.route] || 'login';
         if (nextRoute === 'login') setUser(null);
         setRoute(nextRoute);
         return;
@@ -59,6 +58,15 @@ export default function App() {
         return;
       }
 
+      if (data.type === 'createEvent') {
+        if (!user?.id_usuario) throw new Error('Entre na sua conta para publicar um evento.');
+        discenteAuthRoutes.createEvent({ ...data, organizerId: user.id_usuario });
+        setEvents(discenteAuthRoutes.getEvents());
+        setRoute('inicio');
+        Alert.alert('Evento publicado', 'O evento foi salvo e está aguardando confirmação.');
+        return;
+      }
+
       if (data.type === 'updateInterests') {
         if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
         discenteAuthRoutes.updateUserInterests(user.id_usuario, data.interests);
@@ -70,7 +78,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <HtmlRoute route={route} user={user} onMessage={handleMessage} />
+      <HtmlRoute route={route} user={user} events={events} onMessage={handleMessage} />
     </View>
   );
 }

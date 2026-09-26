@@ -10,6 +10,8 @@ import {
   updateUserInterests,
   getDiscenteById,
   getUserById,
+  createEvent,
+  getEvents,
 } from '../database';
 
 export const authRoutes = {
@@ -23,6 +25,8 @@ export const authRoutes = {
   loginUser: (email_institucional, senha) => loginUser(email_institucional, senha),
   getById: (id_usuario) => getDiscenteById(id_usuario),
   getUserById: (id_usuario) => getUserById(id_usuario),
+  createEvent: (payload) => createEvent(payload),
+  getEvents: () => getEvents(),
   getUserInterests: (id_usuario) => getUserInterests(id_usuario),
   updateUserInterests: (id_usuario, interests) => updateUserInterests(id_usuario, interests),
 };
