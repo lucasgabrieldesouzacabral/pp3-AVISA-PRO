@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { Asset } from 'expo-asset';
+import { File } from 'expo-file-system';
 import { WebView } from 'react-native-webview';
 
 const pages = {
@@ -11,6 +12,17 @@ const pages = {
 };
 
 const stylesheet = require('../Telas/css/styles.css');
+
+async function readAssetText(asset) {
+  if (Platform.OS === 'web') {
+    const response = await fetch(asset.localUri || asset.uri);
+    if (!response.ok) throw new Error(`Falha ao ler asset: ${response.status}`);
+    return response.text();
+  }
+
+  if (!asset.localUri) throw new Error('O asset não foi baixado para o dispositivo.');
+  return new File(asset.localUri).text();
+}
 
 function addBridge(html, css, route, user) {
   const profileData = JSON.stringify({
@@ -81,23 +93,28 @@ function addBridge(html, css, route, user) {
 
 export default function HtmlRoute({ route, user, onMessage }) {
   const [html, setHtml] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let active = true;
+    setHtml('');
+    setLoadError('');
 
     async function loadPage() {
-      const [pageAsset, stylesheetAsset] = await Promise.all([
-        Asset.loadAsync(pages[route]),
-        Asset.loadAsync(stylesheet),
-      ]);
-      const [pageResponse, stylesheetResponse] = await Promise.all([
-        fetch(pageAsset[0].localUri || pageAsset[0].uri),
-        fetch(stylesheetAsset[0].localUri || stylesheetAsset[0].uri),
-      ]);
-      const pageContent = await pageResponse.text();
-      const css = await stylesheetResponse.text();
+      try {
+        const [pageAsset, stylesheetAsset] = await Promise.all([
+          Asset.loadAsync(pages[route]),
+          Asset.loadAsync(stylesheet),
+        ]);
+        const [pageContent, css] = await Promise.all([
+          readAssetText(pageAsset[0]),
+          readAssetText(stylesheetAsset[0]),
+        ]);
 
-      if (active) setHtml(addBridge(pageContent, css, route, user));
+        if (active) setHtml(addBridge(pageContent, css, route, user));
+      } catch (error) {
+        if (active) setLoadError(error?.message || 'Não foi possível carregar esta tela.');
+      }
     }
 
     loadPage();
@@ -121,7 +138,7 @@ export default function HtmlRoute({ route, user, onMessage }) {
   if (!html) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator />
+        {loadError ? <Text style={styles.error}>{loadError}</Text> : <ActivityIndicator />}
       </View>
     );
   }
@@ -142,6 +159,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 24,
+  },
+  error: {
+    color: '#b42318',
+    textAlign: 'center',
   },
   webFrame: {
     width: '100%',
