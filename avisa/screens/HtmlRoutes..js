@@ -12,6 +12,7 @@ const pages = {
   notificacoes: require('../Telas/notificacoes.html'),
   'criar-evento': require('../Telas/criar-evento.html'),
   perfil: require('../Telas/perfil.html'),
+  'editar-perfil': require('../Telas/editar-perfil.html'),
   'visualizar-evento': require('../Telas/visualizar-evento.html'),
 };
 
@@ -119,7 +120,7 @@ function addBridge(html, css, route, user, events, selectedEvent) {
         const link = event.target.closest('a');
         if (!link || !link.getAttribute('href')) return;
         const href = link.getAttribute('href');
-        if (href === 'index.html' || href === 'cadastro.html' || href === 'inicio.html' || href === 'calendario.html' || href === 'notificacoes.html' || href === 'criar-evento.html' || href === 'perfil.html') {
+        if (href === 'index.html' || href === 'cadastro.html' || href === 'inicio.html' || href === 'calendario.html' || href === 'notificacoes.html' || href === 'criar-evento.html' || href === 'perfil.html' || href === 'editar-perfil.html') {
           event.preventDefault();
           const message = JSON.stringify({ type: 'route', route: href });
           if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
@@ -132,7 +133,7 @@ function addBridge(html, css, route, user, events, selectedEvent) {
         const form = new FormData(event.target);
         const data = Object.fromEntries(form.entries());
         const message = JSON.stringify({
-          type: '${route}' === 'cadastro' ? 'register' : '${route}' === 'criar-evento' ? 'createEvent' : 'login',
+          type: '${route}' === 'cadastro' ? 'register' : '${route}' === 'criar-evento' ? 'createEvent' : '${route}' === 'editar-perfil' ? 'updateProfile' : 'login',
           ...data,
           password: data.password
         });
@@ -168,6 +169,12 @@ function addBridge(html, css, route, user, events, selectedEvent) {
     .replaceAll('{{TIPO_USUARIO}}', currentUser.tipo_usuario || '')
     .replaceAll('{{DADO_ESPECIFICO_ROTULO}}', specificField.label)
     .replaceAll('{{DADO_ESPECIFICO}}', specificField.value || '')
+    .replaceAll('{{DADO_ESPECIFICO_CHAVE}}', currentUser.tipo_usuario === 'Docente' ? 'CNDB' : currentUser.tipo_usuario === 'Servidor' ? 'cpf' : 'curso')
+    .replaceAll('{{EDIT_PROFILE_NOME}}', escapeHtml(currentUser.nome_completo || ''))
+    .replaceAll('{{EDIT_PROFILE_EMAIL}}', escapeHtml(currentUser.email_institucional || ''))
+    .replaceAll('{{EDIT_PROFILE_MATRICULA}}', escapeHtml(currentUser.matricula || ''))
+    .replaceAll('{{EDIT_PROFILE_DADO}}', escapeHtml(specificField.value || ''))
+    .replaceAll('{{EDIT_PROFILE_TIPO}}', escapeHtml(currentUser.tipo_usuario || ''))
     .replaceAll('{{INICIAIS_USUARIO}}', initials);
 
   const supportNeeded = Number(selectedEvent?.suporte_terceiros) === 1;

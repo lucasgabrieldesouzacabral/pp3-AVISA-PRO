@@ -27,6 +27,7 @@ export default function App() {
           'notificacoes.html': 'notificacoes',
           'criar-evento.html': 'criar-evento',
           'perfil.html': 'perfil',
+          'editar-perfil.html': 'editar-perfil',
         };
         const nextRoute = routes[data.route] || 'login';
         if (nextRoute === 'login') setUser(null);
@@ -79,6 +80,14 @@ export default function App() {
       if (data.type === 'updateInterests') {
         if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
         discenteAuthRoutes.updateUserInterests(user.id_usuario, data.interests);
+      }
+
+      if (data.type === 'updateProfile') {
+        if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
+        const updatedUser = discenteAuthRoutes.updateUserProfile(user.id_usuario, data);
+        setUser(updatedUser);
+        setRoute('perfil');
+        Alert.alert('Perfil atualizado', 'Suas informações foram salvas com sucesso.');
       }
     } catch (error) {
       Alert.alert('Não foi possível concluir', error.message);

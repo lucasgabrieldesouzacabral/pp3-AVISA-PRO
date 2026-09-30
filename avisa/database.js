@@ -548,4 +548,103 @@ export function getUserById(id_usuario) {
   return { ...usuario, ...(specificData || {}), interesses: getUserInterests(id_usuario) };
 }
 
+export function updateUserProfile(id_usuario, payload) {
+  const userId = Number(id_usuario);
+  const name = String(payload.nome_completo || '').trim();
+  const email = String(payload.email_institucional || '').trim().toLowerCase();
+  const matricula = String(payload.matricula || '').trim();
+
+  if (!Number.isSafeInteger(userId) || userId < 1) throw new Error('Usuário não autenticado.');
+  if (!name || !email.includes('@')) throw new Error('Informe seu nome e um e-mail válido.');
+
+  if (Platform.OS === 'web') {
+    const users = getWebUsers();
+    const userIndex = users.findIndex((user) => Number(user.id_usuario) === userId);
+    if (userIndex < 0) throw new Error('Usuário não encontrado.');
+
+    const currentUser = users[userIndex];
+    const specificColumn = currentUser.tipo_usuario === 'Discente'
+      ? 'curso'
+      : currentUser.tipo_usuario === 'Docente'
+        ? 'CNDB'
+        : 'cpf';
+    const specificValue = String(payload[specificColumn] || '').trim();
+    if (!specificValue) throw new Error('Preencha o dado específico do seu perfil.');
+    if (users.some((user) => Number(user.id_usuario) !== userId && user.email_institucional === email)) {
+      throw new Error('E-mail institucional já cadastrado.');
+    }
+    if (matricula && users.some((user) => Number(user.id_usuario) !== userId && user.matricula === matricula)) {
+      throw new Error('Matrícula já cadastrada.');
+    }
+
+    users[userIndex] = {
+      ...currentUser,
+      nome_completo: name,
+      email_institucional: email,
+      matricula: matricula || null,
+      [specificColumn]: specificValue,
+    };
+    saveWebUsers(users);
+    return { ...users[userIndex], interesses: getWebInterests(userId) };
+  }
+
+  const database = getDatabase();
+  const currentUser = database.getFirstSync(
+    'SELECT id_usuario, tipo_usuario FROM usuarios WHERE id_usuario = ?',
+    [userId]
+  );
+  if (!currentUser) throw new Error('Usuário não encontrado.');
+
+  const specificColumn = currentUser.tipo_usuario === 'Discente'
+    ? 'curso'
+    : currentUser.tipo_usuario === 'Docente'
+      ? 'CNDB'
+      : 'cpf';
+  const specificValue = String(payload[specificColumn] || '').trim();
+  if (!specificValue) throw new Error('Preencha o dado específico do seu perfil.');
+
+  const emailInUse = database.getFirstSync(
+    'SELECT id_usuario FROM usuarios WHERE email_institucional = ? AND id_usuario != ?',
+    [email, userId]
+  );
+  if (emailInUse) throw new Error('E-mail institucional já cadastrado.');
+
+  if (matricula) {
+    const matriculaInUse = database.getFirstSync(
+      'SELECT id_usuario FROM usuarios WHERE matricula = ? AND id_usuario != ?',
+      [matricula, userId]
+    );
+    if (matriculaInUse) throw new Error('Matrícula já cadastrada.');
+  }
+
+  const specificTable = currentUser.tipo_usuario === 'Discente'
+    ? 'discentes'
+    : currentUser.tipo_usuario === 'Docente'
+      ? 'docentes'
+      : 'servidores';
+  database.withTransactionSync(() => {
+    database.runSync(
+      'UPDATE usuarios SET nome_completo = ?, email_institucional = ?, matricula = ? WHERE id_usuario = ?',
+      [name, email, matricula || null, userId]
+    );
+    const existingSpecificData = database.getFirstSync(
+      `SELECT id_usuario FROM ${specificTable} WHERE id_usuario = ?`,
+      [userId]
+    );
+    if (existingSpecificData) {
+      database.runSync(
+        `UPDATE ${specificTable} SET ${specificColumn} = ? WHERE id_usuario = ?`,
+        [specificValue, userId]
+      );
+    } else {
+      database.runSync(
+        `INSERT INTO ${specificTable} (id_usuario, ${specificColumn}) VALUES (?, ?)`,
+        [userId, specificValue]
+      );
+    }
+  });
+
+  return getUserById(userId);
+}
+
 export default { getDatabase };
