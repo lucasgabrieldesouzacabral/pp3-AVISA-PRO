@@ -756,6 +756,68 @@ button {
   color: var(--forest);
 }
 
+.event-moderation {
+  width: min(100%, 900px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 20px;
+  padding: 22px 24px;
+  border: 1px solid rgba(74, 92, 28, 0.2);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(215, 235, 122, 0.28), rgba(255, 252, 245, 0.9));
+}
+
+.event-moderation h2 {
+  margin: 0 0 5px;
+  font-family: 'Fraunces', serif;
+  font-size: 1.35rem;
+}
+
+.event-moderation p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.event-moderation form {
+  flex: 0 0 260px;
+}
+
+.event-moderation .btn {
+  margin-top: 0;
+}
+
+.moderation-actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1.1fr);
+  align-items: end;
+  gap: 14px;
+  flex: 1;
+}
+
+.moderation-actions form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reject-form label {
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.reject-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--ink);
+  resize: vertical;
+}
+
 .cta {
   height: 44px;
   padding: 0 18px;
@@ -1618,6 +1680,21 @@ button {
   .event-owner-actions {
     padding: 18px;
     border-radius: 20px;
+  }
+
+  .event-moderation {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .event-moderation form {
+    flex-basis: auto;
+  }
+
+  .moderation-actions {
+    grid-template-columns: 1fr;
   }
 
   .event-action-fields {

@@ -72,11 +72,16 @@ export default function App() {
 
       if (data.type === 'createEvent') {
         if (!user?.id_usuario) throw new Error('Entre na sua conta para publicar um evento.');
-        discenteAuthRoutes.createEvent({ ...data, organizerId: user.id_usuario });
+        const createdEvent = discenteAuthRoutes.createEvent({ ...data, organizerId: user.id_usuario });
         setEvents(discenteAuthRoutes.getEvents());
         setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
         setRoute('inicio');
-        Alert.alert('Evento publicado', 'O evento foi salvo e está aguardando confirmação.');
+        Alert.alert(
+          'Evento publicado',
+          createdEvent.status === 'Confirmado'
+            ? 'O evento foi salvo e confirmado automaticamente.'
+            : 'O evento foi salvo e está aguardando confirmação.'
+        );
         return;
       }
 
@@ -99,6 +104,34 @@ export default function App() {
             ? 'O evento foi cancelado e uma notificação foi criada.'
             : 'A nova data foi salva e uma notificação foi criada.'
         );
+        return;
+      }
+
+      if (data.type === 'confirmEvent') {
+        if (!user?.id_usuario) throw new Error('Entre na sua conta para confirmar um evento.');
+        const updatedEvent = discenteAuthRoutes.confirmEvent(data.id_evento, user.id_usuario);
+        const refreshedEvents = discenteAuthRoutes.getEvents();
+        const refreshedEvent = refreshedEvents.find((event) => Number(event.id_evento) === Number(data.id_evento));
+        setEvents(refreshedEvents);
+        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        setSelectedEvent(refreshedEvent || updatedEvent);
+        Alert.alert('Evento confirmado', 'O organizador foi notificado sobre a confirmação.');
+        return;
+      }
+
+      if (data.type === 'rejectEvent') {
+        if (!user?.id_usuario) throw new Error('Entre na sua conta para recusar um evento.');
+        const updatedEvent = discenteAuthRoutes.rejectEvent(
+          data.id_evento,
+          user.id_usuario,
+          data.justification
+        );
+        const refreshedEvents = discenteAuthRoutes.getEvents();
+        const refreshedEvent = refreshedEvents.find((event) => Number(event.id_evento) === Number(data.id_evento));
+        setEvents(refreshedEvents);
+        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        setSelectedEvent(refreshedEvent || updatedEvent);
+        Alert.alert('Evento recusado', 'O organizador foi notificado e a justificativa foi registrada.');
         return;
       }
 

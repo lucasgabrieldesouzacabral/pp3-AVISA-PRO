@@ -47,18 +47,19 @@ function renderEvents(events) {
   return events.map((event) => {
     const [year, month, day] = event.data_evento.split('-');
     const monthName = months[Number(month) - 1] || month;
-    const statusClass = event.status === 'Pendente'
+    const statusLabel = event.id_rejeitador ? 'Recusado' : event.status;
+    const statusClass = statusLabel === 'Pendente'
       ? 'badge pending'
-      : event.status === 'Cancelado'
+      : statusLabel === 'Cancelado' || statusLabel === 'Recusado'
         ? 'badge cancelled'
-        : event.status === 'Adiado'
+        : statusLabel === 'Adiado'
           ? 'badge postponed'
           : 'badge';
 
     return `<article class="event-card stored-event" data-event-id="${escapeHtml(event.id_evento)}" role="button" tabindex="0" aria-label="Visualizar ${escapeHtml(event.titulo)}">
       <div class="date-chip"><strong>${escapeHtml(day)}</strong><span>${escapeHtml(monthName)}</span></div>
       <div>
-        <div class="event-top"><h2>${escapeHtml(event.titulo)}</h2><span class="${statusClass}">${escapeHtml(event.status)}</span></div>
+        <div class="event-top"><h2>${escapeHtml(event.titulo)}</h2><span class="${statusClass}">${escapeHtml(statusLabel)}</span></div>
         <div class="meta">
           <span>${escapeHtml(`${day} ${monthName} ${year} • ${event.horario}`)}</span>
           <span>${escapeHtml(event.local)}</span>
@@ -71,23 +72,35 @@ function renderEvents(events) {
 
 function renderRecentHistory(events, user) {
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const isModerator = ['Docente', 'Servidor'].includes(user?.tipo_usuario);
   const userEvents = events
-    .filter((event) => Number(event.id_organizador_principal) === Number(user?.id_usuario))
-    .sort((first, second) => String(second.data_criacao || '').localeCompare(String(first.data_criacao || '')))
+    .filter((event) => isModerator
+      ? Number(event.id_confirmador) === Number(user?.id_usuario)
+      : Number(event.id_organizador_principal) === Number(user?.id_usuario))
+    .sort((first, second) => String(second.data_confirmacao || second.data_criacao || '').localeCompare(String(first.data_confirmacao || first.data_criacao || '')))
     .slice(0, 10);
 
   if (!userEvents.length) {
-    return '<p>Você ainda não criou eventos.</p>';
+    return isModerator
+      ? '<p>Você ainda não confirmou nenhum evento.</p>'
+      : '<p>Você ainda não criou eventos.</p>';
   }
 
   return userEvents.map((event) => {
-    const createdDate = String(event.data_criacao || event.data_evento).split(/[T ]/)[0];
-    const [year, month, day] = createdDate.split('-');
+    const activityDate = isModerator
+      ? String(event.data_confirmacao || event.data_criacao || event.data_evento)
+      : String(event.data_criacao || event.data_evento);
+    const [year, month, day] = activityDate.split(/[T ]/)[0].split('-');
     const dateLabel = `${day} ${months[Number(month) - 1] || ''}`.trim();
+    const description = isModerator
+      ? Number(event.id_confirmador) === Number(event.id_organizador_principal)
+        ? 'Você criou este evento já confirmado.'
+        : `Você confirmou este evento criado por ${escapeHtml(event.nome_organizador || 'um discente')}.`
+      : `Você criou este evento. Status: ${escapeHtml(event.status)}.`;
 
     return `<div class="timeline-item">
       <span class="dot"></span>
-      <div><strong>${escapeHtml(event.titulo)}</strong><p>Você criou este evento. Status: ${escapeHtml(event.status)}.</p></div>
+      <div><strong>${escapeHtml(event.titulo)}</strong><p>${description}</p></div>
       <time>${escapeHtml(dateLabel)}</time>
     </div>`;
   }).join('');
@@ -153,6 +166,31 @@ function renderEventActions(event, user) {
         <label for="reschedule-justification">Justificativa <span>(opcional)</span></label>
         <textarea id="reschedule-justification" name="justification" rows="3" placeholder="Conte, se quiser, o motivo da remarcação."></textarea>
         <button class="btn btn-secondary" type="submit">Remarcar evento</button>
+      </form>
+    </div>
+  </section>`;
+}
+
+function renderEventModeration(event, user) {
+  const canConfirm = ['Docente', 'Servidor'].includes(user?.tipo_usuario);
+  if (!canConfirm || event.status !== 'Pendente') return '';
+
+  return `<section class="event-moderation">
+    <div>
+      <span class="page-kicker">Avaliação institucional</span>
+      <h2>Este evento aguarda confirmação</h2>
+      <p>Confirme a criação para liberar o evento como aprovado para os participantes.</p>
+    </div>
+    <div class="moderation-actions">
+      <form data-form-type="confirmEvent">
+        <input type="hidden" name="id_evento" value="${escapeHtml(event.id_evento)}" />
+        <button class="btn" type="submit">Confirmar criação do evento</button>
+      </form>
+      <form class="reject-form" data-form-type="rejectEvent">
+        <input type="hidden" name="id_evento" value="${escapeHtml(event.id_evento)}" />
+        <button class="btn btn-danger" type="submit">Recusar criação</button>
+        <label for="reject-justification">Justificativa obrigatória</label>
+        <textarea id="reject-justification" name="justification" rows="3" required placeholder="Explique por que a criação foi recusada."></textarea>
       </form>
     </div>
   </section>`;
@@ -263,8 +301,8 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
   const pageWithEventDetails = route === 'visualizar-evento' && selectedEvent
     ? personalizedPage
       .replaceAll('{{EVENT_TITLE}}', escapeHtml(selectedEvent.titulo))
-      .replaceAll('{{EVENT_STATUS_CLASS}}', selectedEvent.status === 'Pendente' ? 'pending' : selectedEvent.status === 'Cancelado' ? 'cancelled' : selectedEvent.status === 'Adiado' ? 'postponed' : '')
-      .replaceAll('{{EVENT_STATUS}}', escapeHtml(selectedEvent.status))
+      .replaceAll('{{EVENT_STATUS_CLASS}}', selectedEvent.status === 'Pendente' ? 'pending' : selectedEvent.id_rejeitador ? 'cancelled' : selectedEvent.status === 'Cancelado' ? 'cancelled' : selectedEvent.status === 'Adiado' ? 'postponed' : '')
+      .replaceAll('{{EVENT_STATUS}}', escapeHtml(selectedEvent.id_rejeitador ? 'Recusado' : selectedEvent.status))
       .replaceAll('{{EVENT_DESCRIPTION}}', escapeHtml(selectedEvent.descricao))
       .replaceAll('{{EVENT_ID}}', escapeHtml(selectedEvent.id_evento))
       .replaceAll('{{EVENT_DATE}}', escapeHtml(formatDate(selectedEvent.data_evento)))
@@ -276,7 +314,10 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
       .replaceAll('{{EVENT_ORGANIZER}}', escapeHtml(selectedEvent.nome_organizador || 'Não informado'))
       .replaceAll('{{EVENT_CREATED_AT}}', escapeHtml(formatDate(selectedEvent.data_criacao)))
       .replaceAll('{{EVENT_STATUS_REASON}}', escapeHtml(selectedEvent.justificativa_status || 'Não informada'))
+      .replaceAll('{{EVENT_MODERATION_LABEL}}', selectedEvent.id_rejeitador ? 'Recusado por' : 'Confirmado por')
+      .replaceAll('{{EVENT_MODERATION_PERSON}}', escapeHtml(selectedEvent.id_rejeitador ? (selectedEvent.nome_rejeitador || 'Não informado') : (selectedEvent.nome_confirmador || 'Ainda não confirmado')))
       .replaceAll('{{EVENT_ACTIONS}}', renderEventActions(selectedEvent, user))
+      .replaceAll('{{EVENT_MODERATION_ACTION}}', renderEventModeration(selectedEvent, user))
     : personalizedPage;
 
   const pageWithEvents = route === 'inicio'
