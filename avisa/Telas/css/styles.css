@@ -830,6 +830,46 @@ button {
   gap: 14px;
 }
 
+.event-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.event-group + .event-group {
+  margin-top: 12px;
+}
+
+.event-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.event-group-head h2 {
+  margin: 0;
+  font-family: 'Fraunces', serif;
+  font-size: 1.25rem;
+}
+
+.event-group-head span {
+  min-width: 24px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(47, 60, 20, 0.09);
+  color: var(--olive);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.event-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .event-card {
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);

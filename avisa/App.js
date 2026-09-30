@@ -18,7 +18,7 @@ export default function App() {
 
   const handleMessage = (message) => {
     try {
-      const data = JSON.parse(message);
+      const data = typeof message === 'string' ? JSON.parse(message) : message;
 
       if (data.type === 'route') {
         const routes = {
@@ -32,6 +32,9 @@ export default function App() {
         };
         const nextRoute = routes[data.route] || 'login';
         if (nextRoute === 'login') setUser(null);
+        if (nextRoute === 'notificacoes' && user?.id_usuario) {
+          setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        }
         setRoute(nextRoute);
         return;
       }

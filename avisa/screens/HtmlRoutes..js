@@ -41,10 +41,24 @@ function escapeHtml(value) {
 
 function renderEvents(events) {
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const statusOrder = [
+    { key: 'Confirmado', label: 'Confirmados' },
+    { key: 'Pendente', label: 'Pendentes' },
+    { key: 'Adiado', label: 'Adiados' },
+    { key: 'Cancelado', label: 'Cancelados' },
+  ];
 
   if (!events.length) return '<p class="event-empty">Ainda não há eventos armazenados.</p>';
 
-  return events.map((event) => {
+  const groupedEvents = events.reduce((groups, event) => {
+    const groupKey = event.id_rejeitador ? 'Cancelado' : event.status;
+    if (groups[groupKey]) groups[groupKey].push(event);
+    return groups;
+  }, { Confirmado: [], Pendente: [], Adiado: [], Cancelado: [] });
+
+  return statusOrder.filter(({ key }) => groupedEvents[key].length).map(({ key, label }) => `<section class="event-group">
+    <div class="event-group-head"><h2>${label}</h2><span>${groupedEvents[key].length}</span></div>
+    <div class="event-group-list">${groupedEvents[key].map((event) => {
     const [year, month, day] = event.data_evento.split('-');
     const monthName = months[Number(month) - 1] || month;
     const statusLabel = event.id_rejeitador ? 'Recusado' : event.status;
@@ -67,7 +81,8 @@ function renderEvents(events) {
         </div>
       </div>
     </article>`;
-  }).join('');
+    }).join('')}</div>
+  </section>`).join('');
 }
 
 function renderRecentHistory(events, user) {
@@ -173,7 +188,7 @@ function renderEventActions(event, user) {
 
 function renderEventModeration(event, user) {
   const canConfirm = ['Docente', 'Servidor'].includes(user?.tipo_usuario);
-  if (!canConfirm || event.status !== 'Pendente') return '';
+  if (!canConfirm || event.tipo_organizador !== 'Discente' || !['Pendente', 'Adiado'].includes(event.status)) return '';
 
   return `<section class="event-moderation">
     <div>
@@ -223,13 +238,18 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
       document.addEventListener('click', function (event) {
         const readButton = event.target.closest('[data-notification-id]');
         if (!readButton) return;
+        event.preventDefault();
+        event.stopPropagation();
         const message = JSON.stringify({ type: 'markNotificationAsRead', id_notificacao: Number(readButton.dataset.notificationId) });
         if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
         else window.parent.postMessage(message, '*');
       });
 
       document.addEventListener('click', function (event) {
-        if (!event.target.closest('[data-mark-all-notifications]')) return;
+        const markAllButton = event.target.closest('[data-mark-all-notifications]');
+        if (!markAllButton) return;
+        event.preventDefault();
+        event.stopPropagation();
         const message = JSON.stringify({ type: 'markAllNotificationsAsRead' });
         if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
         else window.parent.postMessage(message, '*');
@@ -331,7 +351,7 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
     : pageWithEvents;
   const pageWithNotifications = route === 'notificacoes'
     ? pageWithHistory
-      .replace('<section class="notification-list"></section>', `<section class="notification-list">${renderNotifications(notifications || [])}</section>`)
+      .replace('<div class="notification-list"></div>', `<div class="notification-list">${renderNotifications(notifications || [])}</div>`)
       .replace('{{NOTIFICATION_COUNT}}', String((notifications || []).filter((notification) => !Number(notification.lida)).length))
     : pageWithHistory;
 

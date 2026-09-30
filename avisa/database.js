@@ -245,6 +245,19 @@ function createNotification(id_usuario, mensagem) {
   );
 }
 
+function notifyAuthorities(mensagem) {
+  if (Platform.OS === 'web') {
+    getWebUsers()
+      .filter((user) => ['Docente', 'Servidor'].includes(user.tipo_usuario))
+      .forEach((user) => createNotification(user.id_usuario, mensagem));
+    return;
+  }
+
+  getDatabase()
+    .getAllSync("SELECT id_usuario FROM usuarios WHERE tipo_usuario IN ('Docente', 'Servidor')")
+    .forEach((user) => createNotification(user.id_usuario, mensagem));
+}
+
 export function getNotifications(id_usuario) {
   const userId = Number(id_usuario);
 
@@ -324,6 +337,9 @@ export function createEvent(payload) {
         ? `Seu evento "${savedEvent.titulo}" foi publicado e confirmado automaticamente.`
         : `Seu evento "${savedEvent.titulo}" foi publicado e está aguardando confirmação.`
     );
+    if (!autoConfirmed) {
+      notifyAuthorities(`Novo evento de ${organizer.nome_completo}: "${savedEvent.titulo}" aguarda confirmação.`);
+    }
     return savedEvent;
   }
 
@@ -373,6 +389,9 @@ export function createEvent(payload) {
       ? `Seu evento "${savedEvent.titulo}" foi publicado e confirmado automaticamente.`
       : `Seu evento "${savedEvent.titulo}" foi publicado e está aguardando confirmação.`
   );
+  if (!autoConfirmed) {
+    notifyAuthorities(`Novo evento de ${organizer.nome_completo}: "${savedEvent.titulo}" aguarda confirmação.`);
+  }
   return savedEvent;
 }
 
@@ -383,6 +402,7 @@ export function getEvents() {
       .map((event) => ({
         ...event,
         nome_organizador: users.find((user) => user.id_usuario === event.id_organizador_principal)?.nome_completo || '',
+        tipo_organizador: users.find((user) => user.id_usuario === event.id_organizador_principal)?.tipo_usuario || '',
         nome_confirmador: users.find((user) => user.id_usuario === event.id_confirmador)?.nome_completo || '',
         nome_rejeitador: users.find((user) => user.id_usuario === event.id_rejeitador)?.nome_completo || '',
       }))
@@ -390,7 +410,7 @@ export function getEvents() {
   }
 
   return getDatabase().getAllSync(
-    `SELECT e.*, u.nome_completo AS nome_organizador, c.nome_completo AS nome_confirmador, r.nome_completo AS nome_rejeitador
+    `SELECT e.*, u.nome_completo AS nome_organizador, u.tipo_usuario AS tipo_organizador, c.nome_completo AS nome_confirmador, r.nome_completo AS nome_rejeitador
      FROM eventos e
      JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
      LEFT JOIN usuarios c ON c.id_usuario = e.id_confirmador
@@ -420,7 +440,11 @@ export function rejectEvent(id_evento, id_usuario, justification) {
     const eventIndex = events.findIndex((event) => Number(event.id_evento) === eventId);
     const event = events[eventIndex];
     if (!event) throw new Error('Evento não encontrado.');
-    if (event.status !== 'Pendente') throw new Error('Somente eventos pendentes podem ser recusados.');
+    const organizer = users.find((user) => Number(user.id_usuario) === Number(event.id_organizador_principal));
+    if (organizer?.tipo_usuario !== 'Discente') {
+      throw new Error('Eventos criados por autoridades não precisam de confirmação.');
+    }
+    if (!['Pendente', 'Adiado'].includes(event.status)) throw new Error('Somente eventos pendentes ou adiados podem ser recusados.');
 
     const rejectedAt = new Date().toISOString();
     const updatedEvent = {
@@ -437,6 +461,7 @@ export function rejectEvent(id_evento, id_usuario, justification) {
       event.id_organizador_principal,
       `A criação do evento "${event.titulo}" foi recusada por ${rejecter.nome_completo}. Motivo: ${reason}`
     );
+    createNotification(userId, `Você recusou a criação do evento "${event.titulo}".`);
     return updatedEvent;
   }
 
@@ -450,22 +475,29 @@ export function rejectEvent(id_evento, id_usuario, justification) {
   if (!rejecter) throw new Error('Somente docentes e servidores podem recusar eventos.');
 
   const event = database.getFirstSync(
-    'SELECT * FROM eventos WHERE id_evento = ? AND status = \'Pendente\'',
+    `SELECT e.*, u.tipo_usuario AS tipo_organizador
+     FROM eventos e
+     JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
+     WHERE e.id_evento = ? AND e.status IN ('Pendente', 'Adiado')`,
     [eventId]
   );
   if (!event) throw new Error('Evento não encontrado ou já analisado.');
+  if (event.tipo_organizador !== 'Discente') {
+    throw new Error('Eventos criados por autoridades não precisam de confirmação.');
+  }
 
   const rejectedAt = new Date().toISOString();
   database.runSync(
     `UPDATE eventos
      SET status = 'Cancelado', justificativa_status = ?, id_rejeitador = ?, data_rejeicao = ?
-     WHERE id_evento = ? AND status = 'Pendente'`,
+    WHERE id_evento = ? AND status IN ('Pendente', 'Adiado')`,
     [reason, userId, rejectedAt, eventId]
   );
   createNotification(
     event.id_organizador_principal,
     `A criação do evento "${event.titulo}" foi recusada por ${rejecter.nome_completo}. Motivo: ${reason}`
   );
+  createNotification(userId, `Você recusou a criação do evento "${event.titulo}".`);
 
   return database.getFirstSync(
     `SELECT e.*, u.nome_completo AS nome_organizador, r.nome_completo AS nome_rejeitador
@@ -496,7 +528,11 @@ export function confirmEvent(id_evento, id_usuario) {
     const eventIndex = events.findIndex((event) => Number(event.id_evento) === eventId);
     const event = events[eventIndex];
     if (!event) throw new Error('Evento não encontrado.');
-    if (event.status !== 'Pendente') throw new Error('Somente eventos pendentes podem ser confirmados.');
+    const organizer = users.find((user) => Number(user.id_usuario) === Number(event.id_organizador_principal));
+    if (organizer?.tipo_usuario !== 'Discente') {
+      throw new Error('Eventos criados por autoridades não precisam de confirmação.');
+    }
+    if (!['Pendente', 'Adiado'].includes(event.status)) throw new Error('Somente eventos pendentes ou adiados podem ser confirmados.');
 
     const confirmedAt = new Date().toISOString();
     const updatedEvent = {
@@ -505,6 +541,8 @@ export function confirmEvent(id_evento, id_usuario) {
       id_confirmador: userId,
       nome_confirmador: confirmer.nome_completo,
       data_confirmacao: confirmedAt,
+      id_rejeitador: null,
+      data_rejeicao: null,
     };
     events[eventIndex] = updatedEvent;
     window.localStorage.setItem(WEB_EVENTS_KEY, JSON.stringify(events));
@@ -512,6 +550,7 @@ export function confirmEvent(id_evento, id_usuario) {
       event.id_organizador_principal,
       `Seu evento "${event.titulo}" foi confirmado por ${confirmer.nome_completo}.`
     );
+    createNotification(userId, `Você confirmou o evento "${event.titulo}".`);
     return updatedEvent;
   }
 
@@ -525,25 +564,32 @@ export function confirmEvent(id_evento, id_usuario) {
   if (!confirmer) throw new Error('Somente docentes e servidores podem confirmar eventos.');
 
   const event = database.getFirstSync(
-    'SELECT * FROM eventos WHERE id_evento = ? AND status = \'Pendente\'',
+    `SELECT e.*, u.tipo_usuario AS tipo_organizador
+     FROM eventos e
+     JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
+     WHERE e.id_evento = ? AND e.status IN ('Pendente', 'Adiado')`,
     [eventId]
   );
   if (!event) throw new Error('Evento não encontrado ou já confirmado.');
+  if (event.tipo_organizador !== 'Discente') {
+    throw new Error('Eventos criados por autoridades não precisam de confirmação.');
+  }
 
   const confirmedAt = new Date().toISOString();
   database.runSync(
     `UPDATE eventos
-     SET status = 'Confirmado', id_confirmador = ?, data_confirmacao = ?
-     WHERE id_evento = ? AND status = 'Pendente'`,
+    SET status = 'Confirmado', id_confirmador = ?, data_confirmacao = ?, id_rejeitador = NULL, data_rejeicao = NULL
+    WHERE id_evento = ? AND status IN ('Pendente', 'Adiado')`,
     [userId, confirmedAt, eventId]
   );
   createNotification(
     event.id_organizador_principal,
     `Seu evento "${event.titulo}" foi confirmado por ${confirmer.nome_completo}.`
   );
+  createNotification(userId, `Você confirmou o evento "${event.titulo}".`);
 
   return database.getFirstSync(
-    `SELECT e.*, u.nome_completo AS nome_organizador, c.nome_completo AS nome_confirmador
+    `SELECT e.*, u.nome_completo AS nome_organizador, u.tipo_usuario AS tipo_organizador, c.nome_completo AS nome_confirmador
      FROM eventos e
      JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
      LEFT JOIN usuarios c ON c.id_usuario = e.id_confirmador
@@ -575,6 +621,7 @@ export function updateEventStatus(id_evento, id_usuario, action, payload = {}) {
   }
 
   if (Platform.OS === 'web') {
+    const users = getWebUsers();
     const events = getWebEvents();
     const eventIndex = events.findIndex((event) => Number(event.id_evento) === eventId);
     const event = events[eventIndex];
@@ -583,6 +630,7 @@ export function updateEventStatus(id_evento, id_usuario, action, payload = {}) {
     if (Number(event.id_organizador_principal) !== userId) {
       throw new Error('Somente o organizador pode alterar este evento.');
     }
+    const organizer = users.find((user) => Number(user.id_usuario) === Number(event.id_organizador_principal));
 
     const updatedEvent = {
       ...event,
@@ -598,12 +646,22 @@ export function updateEventStatus(id_evento, id_usuario, action, payload = {}) {
         ? `O evento "${event.titulo}" foi cancelado.`
         : `O evento "${event.titulo}" foi remarcado para ${date} às ${time}.`
     );
+    if (organizer?.tipo_usuario === 'Discente') {
+      notifyAuthorities(
+        normalizedAction === 'cancel'
+          ? `O evento "${event.titulo}" foi cancelado pelo organizador.`
+          : `O evento "${event.titulo}" foi adiado e aguarda nova confirmação.`
+      );
+    }
     return updatedEvent;
   }
 
   const database = getDatabase();
   const event = database.getFirstSync(
-    'SELECT * FROM eventos WHERE id_evento = ? AND id_organizador_principal = ?',
+    `SELECT e.*, u.nome_completo AS nome_organizador, u.tipo_usuario AS tipo_organizador
+     FROM eventos e
+     JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
+     WHERE e.id_evento = ? AND e.id_organizador_principal = ?`,
     [eventId, userId]
   );
   if (!event) throw new Error('Evento não encontrado ou você não é o organizador.');
@@ -620,6 +678,13 @@ export function updateEventStatus(id_evento, id_usuario, action, payload = {}) {
       ? `O evento "${event.titulo}" foi cancelado.`
       : `O evento "${event.titulo}" foi remarcado para ${date} às ${time}.`
   );
+  if (event.tipo_organizador === 'Discente') {
+    notifyAuthorities(
+      normalizedAction === 'cancel'
+        ? `O evento "${event.titulo}" foi cancelado pelo organizador.`
+        : `O evento "${event.titulo}" foi adiado e aguarda nova confirmação.`
+    );
+  }
 
   return database.getFirstSync(
     `SELECT e.*, u.nome_completo AS nome_organizador
