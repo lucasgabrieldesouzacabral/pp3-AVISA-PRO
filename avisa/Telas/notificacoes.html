@@ -55,14 +55,33 @@
           <a class="logout" href="index.html">Sair</a>
         </div>
       </aside>
-      <main class="main">
-        <header class="page-head">
-          <div>
-            <h1>Notificações</h1>
-            <p>Avisos de inscrições, confirmações e lembretes aparecerão aqui.</p>
+      <main class="main notifications-main">
+        <header class="page-head notification-head">
+          <div class="notification-heading">
+            <div class="notification-heading-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
+            </div>
+            <div>
+              <span class="page-kicker">Central de avisos</span>
+              <h1>Notificações</h1>
+              <p><span class="notification-count">{{NOTIFICATION_COUNT}}</span> avisos aguardando sua atenção</p>
+            </div>
           </div>
+          <button class="secondary-button" type="button" data-mark-all-notifications>Marcar todas como lidas</button>
         </header>
-        <div class="placeholder">Conteúdo desta tela em construção.</div>
+        <section class="notification-panel">
+          <div class="notification-panel-head">
+            <div>
+              <h2>Atividade recente</h2>
+              <p>Atualizações dos seus eventos aparecem aqui.</p>
+            </div>
+            <span class="notification-live"><span></span> Atualizado agora</span>
+          </div>
+          <div class="notification-list"></div>
+        </section>
       </main>
     </div>
   </body>

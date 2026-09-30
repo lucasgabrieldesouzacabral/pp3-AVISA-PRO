@@ -5,6 +5,7 @@ let db;
 const WEB_USERS_KEY = 'meuavisa.usuarios';
 const WEB_INTERESTS_KEY = 'meuavisa.interesses';
 const WEB_EVENTS_KEY = 'meuavisa.eventos';
+const WEB_NOTIFICATIONS_KEY = 'meuavisa.notificacoes';
 
 function getDatabase() {
   if (Platform.OS === 'web') {
@@ -74,6 +75,7 @@ export function initDatabase() {
       suporte_detalhes TEXT,
       status TEXT NOT NULL DEFAULT 'Pendente'
         CHECK (status IN ('Pendente', 'Confirmado', 'Cancelado', 'Adiado')),
+      justificativa_status TEXT,
       data_criacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       id_organizador_principal INTEGER NOT NULL,
       FOREIGN KEY (id_organizador_principal) REFERENCES usuarios (id_usuario)
@@ -130,6 +132,9 @@ export function initDatabase() {
       ALTER TABLE eventos ADD COLUMN data_criacao TEXT;
       UPDATE eventos SET data_criacao = CURRENT_TIMESTAMP WHERE data_criacao IS NULL;
     `);
+  }
+  if (!eventColumns.some((column) => column.name === 'justificativa_status')) {
+    getDatabase().execSync('ALTER TABLE eventos ADD COLUMN justificativa_status TEXT');
   }
 }
 
@@ -189,6 +194,92 @@ function getWebEvents() {
   return JSON.parse(window.localStorage.getItem(WEB_EVENTS_KEY) || '[]');
 }
 
+function getWebNotifications() {
+  return JSON.parse(window.localStorage.getItem(WEB_NOTIFICATIONS_KEY) || '[]');
+}
+
+function saveWebNotifications(notifications) {
+  window.localStorage.setItem(WEB_NOTIFICATIONS_KEY, JSON.stringify(notifications));
+}
+
+function createNotification(id_usuario, mensagem) {
+  const notification = {
+    id_notificacao: Date.now(),
+    id_usuario: Number(id_usuario),
+    mensagem,
+    data_envio: new Date().toISOString(),
+    lida: 0,
+  };
+
+  if (Platform.OS === 'web') {
+    saveWebNotifications([notification, ...getWebNotifications()]);
+    return notification;
+  }
+
+  const database = getDatabase();
+  const result = database.runSync(
+    'INSERT INTO notificacoes (id_usuario, mensagem) VALUES (?, ?)',
+    [notification.id_usuario, notification.mensagem]
+  );
+
+  return database.getFirstSync(
+    'SELECT id_notificacao, id_usuario, mensagem, data_envio, lida FROM notificacoes WHERE id_notificacao = ?',
+    [result.lastInsertRowId]
+  );
+}
+
+export function getNotifications(id_usuario) {
+  const userId = Number(id_usuario);
+
+  if (Platform.OS === 'web') {
+    return getWebNotifications()
+      .filter((notification) => Number(notification.id_usuario) === userId)
+      .sort((first, second) => String(second.data_envio).localeCompare(String(first.data_envio)));
+  }
+
+  return getDatabase().getAllSync(
+    `SELECT id_notificacao, id_usuario, mensagem, data_envio, lida
+     FROM notificacoes
+     WHERE id_usuario = ?
+     ORDER BY datetime(data_envio) DESC, id_notificacao DESC`,
+    [userId]
+  );
+}
+
+export function markNotificationAsRead(id_notificacao, id_usuario) {
+  const notificationId = Number(id_notificacao);
+  const userId = Number(id_usuario);
+
+  if (Platform.OS === 'web') {
+    const notifications = getWebNotifications().map((notification) => (
+      Number(notification.id_notificacao) === notificationId && Number(notification.id_usuario) === userId
+        ? { ...notification, lida: 1 }
+        : notification
+    ));
+    saveWebNotifications(notifications);
+    return;
+  }
+
+  getDatabase().runSync(
+    'UPDATE notificacoes SET lida = 1 WHERE id_notificacao = ? AND id_usuario = ?',
+    [notificationId, userId]
+  );
+}
+
+export function markAllNotificationsAsRead(id_usuario) {
+  const userId = Number(id_usuario);
+
+  if (Platform.OS === 'web') {
+    const notifications = getWebNotifications().map((notification) => (
+      Number(notification.id_usuario) === userId ? { ...notification, lida: 1 } : notification
+    ));
+    saveWebNotifications(notifications);
+    return;
+  }
+
+  getDatabase().runSync('UPDATE notificacoes SET lida = 1 WHERE id_usuario = ?', [userId]);
+}
+
 export function createEvent(payload) {
   const event = normalizeEventPayload(payload);
 
@@ -206,6 +297,10 @@ export function createEvent(payload) {
       nome_organizador: organizer.nome_completo,
     };
     window.localStorage.setItem(WEB_EVENTS_KEY, JSON.stringify([savedEvent, ...events]));
+    createNotification(
+      event.id_organizador_principal,
+      `Seu evento "${savedEvent.titulo}" foi publicado e está aguardando confirmação.`
+    );
     return savedEvent;
   }
 
@@ -236,13 +331,19 @@ export function createEvent(payload) {
     ]
   );
 
-  return database.getFirstSync(
+  const savedEvent = database.getFirstSync(
     `SELECT e.*, u.nome_completo AS nome_organizador
      FROM eventos e
      JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
      WHERE e.id_evento = ?`,
     [result.lastInsertRowId]
   );
+
+  createNotification(
+    event.id_organizador_principal,
+    `Seu evento "${savedEvent.titulo}" foi publicado e está aguardando confirmação.`
+  );
+  return savedEvent;
 }
 
 export function getEvents() {
@@ -261,6 +362,84 @@ export function getEvents() {
      FROM eventos e
      JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
     ORDER BY e.data_evento, e.horario`
+  );
+}
+
+export function updateEventStatus(id_evento, id_usuario, action, payload = {}) {
+  const eventId = Number(id_evento);
+  const userId = Number(id_usuario);
+  const normalizedAction = String(action || '').trim();
+  const justification = String(payload.justification || '').trim();
+
+  if (!Number.isSafeInteger(eventId) || eventId < 1 || !Number.isSafeInteger(userId) || userId < 1) {
+    throw new Error('Evento ou usuário inválido.');
+  }
+
+  if (!['cancel', 'reschedule'].includes(normalizedAction)) {
+    throw new Error('Ação de evento inválida.');
+  }
+
+  const status = normalizedAction === 'cancel' ? 'Cancelado' : 'Adiado';
+  const date = String(payload.date || '').trim();
+  const time = String(payload.time || '').trim();
+
+  if (normalizedAction === 'reschedule' && (!date || !time)) {
+    throw new Error('Informe a nova data e o novo horário do evento.');
+  }
+
+  if (Platform.OS === 'web') {
+    const events = getWebEvents();
+    const eventIndex = events.findIndex((event) => Number(event.id_evento) === eventId);
+    const event = events[eventIndex];
+
+    if (!event) throw new Error('Evento não encontrado.');
+    if (Number(event.id_organizador_principal) !== userId) {
+      throw new Error('Somente o organizador pode alterar este evento.');
+    }
+
+    const updatedEvent = {
+      ...event,
+      status,
+      justificativa_status: justification,
+      ...(normalizedAction === 'reschedule' ? { data_evento: date, horario: time } : {}),
+    };
+    events[eventIndex] = updatedEvent;
+    window.localStorage.setItem(WEB_EVENTS_KEY, JSON.stringify(events));
+    createNotification(
+      userId,
+      normalizedAction === 'cancel'
+        ? `O evento "${event.titulo}" foi cancelado.`
+        : `O evento "${event.titulo}" foi remarcado para ${date} às ${time}.`
+    );
+    return updatedEvent;
+  }
+
+  const database = getDatabase();
+  const event = database.getFirstSync(
+    'SELECT * FROM eventos WHERE id_evento = ? AND id_organizador_principal = ?',
+    [eventId, userId]
+  );
+  if (!event) throw new Error('Evento não encontrado ou você não é o organizador.');
+
+  database.runSync(
+    `UPDATE eventos
+     SET status = ?, justificativa_status = ?, data_evento = COALESCE(?, data_evento), horario = COALESCE(?, horario)
+     WHERE id_evento = ? AND id_organizador_principal = ?`,
+    [status, justification || null, normalizedAction === 'reschedule' ? date : null, normalizedAction === 'reschedule' ? time : null, eventId, userId]
+  );
+  createNotification(
+    userId,
+    normalizedAction === 'cancel'
+      ? `O evento "${event.titulo}" foi cancelado.`
+      : `O evento "${event.titulo}" foi remarcado para ${date} às ${time}.`
+  );
+
+  return database.getFirstSync(
+    `SELECT e.*, u.nome_completo AS nome_organizador
+     FROM eventos e
+     JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
+     WHERE e.id_evento = ?`,
+    [eventId]
   );
 }
 

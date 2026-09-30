@@ -12,7 +12,11 @@ import {
   getUserById,
   updateUserProfile,
   createEvent,
+  updateEventStatus,
   getEvents,
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
 } from '../database';
 
 export const authRoutes = {
@@ -28,7 +32,11 @@ export const authRoutes = {
   getUserById: (id_usuario) => getUserById(id_usuario),
   updateUserProfile: (id_usuario, payload) => updateUserProfile(id_usuario, payload),
   createEvent: (payload) => createEvent(payload),
+  updateEventStatus: (id_evento, id_usuario, action, payload) => updateEventStatus(id_evento, id_usuario, action, payload),
   getEvents: () => getEvents(),
+  getNotifications: (id_usuario) => getNotifications(id_usuario),
+  markNotificationAsRead: (id_notificacao, id_usuario) => markNotificationAsRead(id_notificacao, id_usuario),
+  markAllNotificationsAsRead: (id_usuario) => markAllNotificationsAsRead(id_usuario),
   getUserInterests: (id_usuario) => getUserInterests(id_usuario),
   updateUserInterests: (id_usuario, interests) => updateUserInterests(id_usuario, interests),
 };

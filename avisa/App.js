@@ -8,6 +8,7 @@ export default function App() {
   const [route, setRoute] = useState('login');
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function App() {
       if (data.type === 'login') {
         const usuario = discenteAuthRoutes.loginUser(data.email, data.password);
         setUser(usuario);
+        setNotifications(discenteAuthRoutes.getNotifications(usuario.id_usuario));
         setRoute('inicio');
         Alert.alert('Login realizado', `Bem-vindo(a), ${usuario.nome_completo}.`);
         return;
@@ -72,8 +74,45 @@ export default function App() {
         if (!user?.id_usuario) throw new Error('Entre na sua conta para publicar um evento.');
         discenteAuthRoutes.createEvent({ ...data, organizerId: user.id_usuario });
         setEvents(discenteAuthRoutes.getEvents());
+        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
         setRoute('inicio');
         Alert.alert('Evento publicado', 'O evento foi salvo e está aguardando confirmação.');
+        return;
+      }
+
+      if (data.type === 'eventAction') {
+        if (!user?.id_usuario) throw new Error('Entre na sua conta para alterar um evento.');
+        const updatedEvent = discenteAuthRoutes.updateEventStatus(
+          data.id_evento,
+          user.id_usuario,
+          data.action,
+          data
+        );
+        const refreshedEvents = discenteAuthRoutes.getEvents();
+        const refreshedEvent = refreshedEvents.find((event) => Number(event.id_evento) === Number(data.id_evento));
+        setEvents(refreshedEvents);
+        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        setSelectedEvent(refreshedEvent || updatedEvent);
+        Alert.alert(
+          data.action === 'cancel' ? 'Evento cancelado' : 'Evento remarcado',
+          data.action === 'cancel'
+            ? 'O evento foi cancelado e uma notificação foi criada.'
+            : 'A nova data foi salva e uma notificação foi criada.'
+        );
+        return;
+      }
+
+      if (data.type === 'markNotificationAsRead') {
+        if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
+        discenteAuthRoutes.markNotificationAsRead(data.id_notificacao, user.id_usuario);
+        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        return;
+      }
+
+      if (data.type === 'markAllNotificationsAsRead') {
+        if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
+        discenteAuthRoutes.markAllNotificationsAsRead(user.id_usuario);
+        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
         return;
       }
 
@@ -96,7 +135,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <HtmlRoute route={route} user={user} events={events} selectedEvent={selectedEvent} onMessage={handleMessage} />
+      <HtmlRoute route={route} user={user} events={events} notifications={notifications} selectedEvent={selectedEvent} onMessage={handleMessage} />
     </View>
   );
 }

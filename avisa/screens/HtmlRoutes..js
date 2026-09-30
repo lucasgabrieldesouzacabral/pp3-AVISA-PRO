@@ -47,7 +47,13 @@ function renderEvents(events) {
   return events.map((event) => {
     const [year, month, day] = event.data_evento.split('-');
     const monthName = months[Number(month) - 1] || month;
-    const statusClass = event.status === 'Pendente' ? 'badge pending' : 'badge';
+    const statusClass = event.status === 'Pendente'
+      ? 'badge pending'
+      : event.status === 'Cancelado'
+        ? 'badge cancelled'
+        : event.status === 'Adiado'
+          ? 'badge postponed'
+          : 'badge';
 
     return `<article class="event-card stored-event" data-event-id="${escapeHtml(event.id_evento)}" role="button" tabindex="0" aria-label="Visualizar ${escapeHtml(event.titulo)}">
       <div class="date-chip"><strong>${escapeHtml(day)}</strong><span>${escapeHtml(monthName)}</span></div>
@@ -92,7 +98,67 @@ function formatDate(value) {
   return dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : 'Não informado';
 }
 
-function addBridge(html, css, route, user, events, selectedEvent) {
+function formatNotificationDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Agora';
+  return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function renderNotifications(notifications) {
+  if (!notifications.length) {
+    return '<div class="notification-empty"><strong>Tudo em dia</strong><p>Você ainda não recebeu nenhuma notificação.</p></div>';
+  }
+
+  return notifications.map((notification) => `
+    <article class="notification-item${Number(notification.lida) ? '' : ' unread'}">
+      <span class="notification-icon" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>
+      </span>
+      <div class="notification-content">
+        <p>${escapeHtml(notification.mensagem)}</p>
+        <time>${escapeHtml(formatNotificationDate(notification.data_envio))}</time>
+      </div>
+      ${Number(notification.lida) ? '' : `<button class="notification-read" type="button" data-notification-id="${escapeHtml(notification.id_notificacao)}">Marcar como lida</button>`}
+    </article>`
+  ).join('');
+}
+
+function renderEventActions(event, user) {
+  if (Number(event?.id_organizador_principal) !== Number(user?.id_usuario)) return '';
+  if (event.status === 'Cancelado') {
+    return `<div class="event-actions-note">Este evento já está marcado como <strong>${escapeHtml(event.status.toLowerCase())}</strong>.</div>`;
+  }
+
+  return `<section class="event-owner-actions">
+    <div>
+      <span class="page-kicker">Ações do organizador</span>
+      <h2>Precisa atualizar este evento?</h2>
+      <p>Você pode cancelar ou informar uma nova data. A justificativa é opcional.</p>
+    </div>
+    <div class="event-action-grid">
+      <form class="event-action-card cancel-action" data-form-type="eventAction">
+        <input type="hidden" name="id_evento" value="${escapeHtml(event.id_evento)}" />
+        <input type="hidden" name="action" value="cancel" />
+        <label for="cancel-justification">Justificativa <span>(opcional)</span></label>
+        <textarea id="cancel-justification" name="justification" rows="3" placeholder="Conte, se quiser, por que o evento foi cancelado."></textarea>
+        <button class="btn btn-danger" type="submit">Cancelar evento</button>
+      </form>
+      <form class="event-action-card" data-form-type="eventAction">
+        <input type="hidden" name="id_evento" value="${escapeHtml(event.id_evento)}" />
+        <input type="hidden" name="action" value="reschedule" />
+        <div class="event-action-fields">
+          <label>Nova data<input type="date" name="date" value="${escapeHtml(event.data_evento)}" required /></label>
+          <label>Novo horário<input type="time" name="time" value="${escapeHtml(event.horario)}" required /></label>
+        </div>
+        <label for="reschedule-justification">Justificativa <span>(opcional)</span></label>
+        <textarea id="reschedule-justification" name="justification" rows="3" placeholder="Conte, se quiser, o motivo da remarcação."></textarea>
+        <button class="btn btn-secondary" type="submit">Remarcar evento</button>
+      </form>
+    </div>
+  </section>`;
+}
+
+function addBridge(html, css, route, user, events, notifications, selectedEvent) {
   const profileData = JSON.stringify({
     id_usuario: user?.id_usuario || null,
     interesses: user?.interesses || [],
@@ -117,6 +183,21 @@ function addBridge(html, css, route, user, events, selectedEvent) {
       });
 
       document.addEventListener('click', function (event) {
+        const readButton = event.target.closest('[data-notification-id]');
+        if (!readButton) return;
+        const message = JSON.stringify({ type: 'markNotificationAsRead', id_notificacao: Number(readButton.dataset.notificationId) });
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
+        else window.parent.postMessage(message, '*');
+      });
+
+      document.addEventListener('click', function (event) {
+        if (!event.target.closest('[data-mark-all-notifications]')) return;
+        const message = JSON.stringify({ type: 'markAllNotificationsAsRead' });
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
+        else window.parent.postMessage(message, '*');
+      });
+
+      document.addEventListener('click', function (event) {
         const link = event.target.closest('a');
         if (!link || !link.getAttribute('href')) return;
         const href = link.getAttribute('href');
@@ -130,10 +211,11 @@ function addBridge(html, css, route, user, events, selectedEvent) {
 
       document.addEventListener('submit', function (event) {
         event.preventDefault();
-        const form = new FormData(event.target);
+        const formElement = event.target;
+        const form = new FormData(formElement);
         const data = Object.fromEntries(form.entries());
         const message = JSON.stringify({
-          type: '${route}' === 'cadastro' ? 'register' : '${route}' === 'criar-evento' ? 'createEvent' : '${route}' === 'editar-perfil' ? 'updateProfile' : 'login',
+          type: formElement.getAttribute('data-form-type') || ('${route}' === 'cadastro' ? 'register' : '${route}' === 'criar-evento' ? 'createEvent' : '${route}' === 'editar-perfil' ? 'updateProfile' : 'login'),
           ...data,
           password: data.password
         });
@@ -181,7 +263,7 @@ function addBridge(html, css, route, user, events, selectedEvent) {
   const pageWithEventDetails = route === 'visualizar-evento' && selectedEvent
     ? personalizedPage
       .replaceAll('{{EVENT_TITLE}}', escapeHtml(selectedEvent.titulo))
-      .replaceAll('{{EVENT_STATUS_CLASS}}', selectedEvent.status === 'Pendente' ? 'pending' : '')
+      .replaceAll('{{EVENT_STATUS_CLASS}}', selectedEvent.status === 'Pendente' ? 'pending' : selectedEvent.status === 'Cancelado' ? 'cancelled' : selectedEvent.status === 'Adiado' ? 'postponed' : '')
       .replaceAll('{{EVENT_STATUS}}', escapeHtml(selectedEvent.status))
       .replaceAll('{{EVENT_DESCRIPTION}}', escapeHtml(selectedEvent.descricao))
       .replaceAll('{{EVENT_ID}}', escapeHtml(selectedEvent.id_evento))
@@ -193,6 +275,8 @@ function addBridge(html, css, route, user, events, selectedEvent) {
       .replaceAll('{{EVENT_SUPPORT_DETAILS}}', escapeHtml(selectedEvent.suporte_detalhes || 'Não informado'))
       .replaceAll('{{EVENT_ORGANIZER}}', escapeHtml(selectedEvent.nome_organizador || 'Não informado'))
       .replaceAll('{{EVENT_CREATED_AT}}', escapeHtml(formatDate(selectedEvent.data_criacao)))
+      .replaceAll('{{EVENT_STATUS_REASON}}', escapeHtml(selectedEvent.justificativa_status || 'Não informada'))
+      .replaceAll('{{EVENT_ACTIONS}}', renderEventActions(selectedEvent, user))
     : personalizedPage;
 
   const pageWithEvents = route === 'inicio'
@@ -204,11 +288,16 @@ function addBridge(html, css, route, user, events, selectedEvent) {
   const pageWithHistory = route === 'perfil'
     ? pageWithEvents.replace('<div class="timeline">', `<div class="timeline">${renderRecentHistory(events, user)}`)
     : pageWithEvents;
+  const pageWithNotifications = route === 'notificacoes'
+    ? pageWithHistory
+      .replace('<section class="notification-list"></section>', `<section class="notification-list">${renderNotifications(notifications || [])}</section>`)
+      .replace('{{NOTIFICATION_COUNT}}', String((notifications || []).filter((notification) => !Number(notification.lida)).length))
+    : pageWithHistory;
 
-  return pageWithHistory.replace('</head>', `<style>${css}</style>${bridge}</head>`);
+  return pageWithNotifications.replace('</head>', `<style>${css}</style>${bridge}</head>`);
 }
 
-export default function HtmlRoute({ route, user, events, selectedEvent, onMessage }) {
+export default function HtmlRoute({ route, user, events, notifications, selectedEvent, onMessage }) {
   const [html, setHtml] = useState('');
   const [loadError, setLoadError] = useState('');
 
@@ -228,7 +317,7 @@ export default function HtmlRoute({ route, user, events, selectedEvent, onMessag
           readAssetText(stylesheetAsset[0]),
         ]);
 
-        if (active) setHtml(addBridge(pageContent, css, route, user, events || [], selectedEvent));
+        if (active) setHtml(addBridge(pageContent, css, route, user, events || [], notifications || [], selectedEvent));
       } catch (error) {
         if (active) setLoadError(error?.message || 'Não foi possível carregar esta tela.');
       }
@@ -238,7 +327,7 @@ export default function HtmlRoute({ route, user, events, selectedEvent, onMessag
     return () => {
       active = false;
     };
-  }, [route, user, events, selectedEvent]);
+  }, [route, user, events, notifications, selectedEvent]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
