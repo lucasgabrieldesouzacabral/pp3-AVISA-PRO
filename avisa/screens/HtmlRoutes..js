@@ -115,8 +115,7 @@ function renderRecentHistory(events, user) {
     .filter((event) => isModerator
       ? Number(event.id_confirmador) === Number(user?.id_usuario)
       : Number(event.id_organizador_principal) === Number(user?.id_usuario))
-    .sort((first, second) => String(second.data_confirmacao || second.data_criacao || '').localeCompare(String(first.data_confirmacao || first.data_criacao || '')))
-    .slice(0, 10);
+    .sort((first, second) => String(second.data_confirmacao || second.data_criacao || '').localeCompare(String(first.data_confirmacao || first.data_criacao || '')));
 
   if (!userEvents.length) {
     return isModerator
@@ -124,7 +123,7 @@ function renderRecentHistory(events, user) {
       : '<p>Você ainda não criou eventos.</p>';
   }
 
-  return userEvents.map((event) => {
+  const historyItems = userEvents.map((event, index) => {
     const activityDate = isModerator
       ? String(event.data_confirmacao || event.data_criacao || event.data_evento)
       : String(event.data_criacao || event.data_evento);
@@ -136,12 +135,18 @@ function renderRecentHistory(events, user) {
         : `Você confirmou este evento criado por ${escapeHtml(event.nome_organizador || 'um discente')}.`
       : `Você criou este evento. Status: ${escapeHtml(event.status)}.`;
 
-    return `<div class="timeline-item">
+    return `<div class="timeline-item" data-history-item${index >= 3 ? ' hidden' : ''}>
       <span class="dot"></span>
       <div><strong>${escapeHtml(event.titulo)}</strong><p>${description}</p></div>
       <time>${escapeHtml(dateLabel)}</time>
     </div>`;
   }).join('');
+
+  const historyToggle = userEvents.length > 3
+    ? '<button class="history-toggle" type="button" data-history-toggle aria-expanded="false">Ver tudo</button>'
+    : '';
+
+  return `${historyItems}${historyToggle}`;
 }
 
 function formatDate(value) {
@@ -242,6 +247,25 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
   const bridge = `
     <script>
       window.__AVISA_PROFILE__ = ${profileData};
+
+      document.addEventListener('click', function (event) {
+        const toggle = event.target.closest('[data-history-toggle]');
+        if (!toggle) return;
+
+        const timeline = toggle.closest('.timeline');
+        const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+        timeline.querySelectorAll('[data-history-item]').forEach(function (item, index) {
+          if (index < 3) return;
+          item.hidden = !expanded;
+          item.classList.remove('history-item-entering');
+          if (expanded) {
+            void item.offsetWidth;
+            item.classList.add('history-item-entering');
+          }
+        });
+        toggle.setAttribute('aria-expanded', String(expanded));
+        toggle.textContent = expanded ? 'Ver menos' : 'Ver tudo';
+      });
 
       function selectEventFilter(tab) {
         const tabs = Array.from(document.querySelectorAll('[data-event-filter]'));

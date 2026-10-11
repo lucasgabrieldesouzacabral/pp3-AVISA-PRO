@@ -2139,9 +2139,41 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
+.timeline-item[hidden] {
+  display: none;
+}
+
+.timeline-item.history-item-entering {
+  animation: event-filter-enter 0.22s ease both;
+}
+
 .timeline-item:last-child {
   border-bottom: 0;
   padding-bottom: 0;
+}
+
+.history-toggle {
+  justify-self: start;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--olive);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.history-toggle:hover {
+  background: rgba(215, 235, 122, 0.24);
+  color: var(--forest-deep);
+}
+
+.history-toggle:focus-visible {
+  outline: 3px solid var(--olive);
+  outline-offset: 2px;
 }
 
 .dot {
@@ -2393,7 +2425,8 @@ button {
   .event-search,
   .event-filter,
   .event-group.is-entering,
-  .event-group.is-entering .event-card {
+  .event-group.is-entering .event-card,
+  .timeline-item.history-item-entering {
     animation: none;
     transition: none;
   }
