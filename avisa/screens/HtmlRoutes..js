@@ -42,13 +42,12 @@ function escapeHtml(value) {
 function renderEvents(events) {
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const statusOrder = [
+    { key: 'Todos', label: 'Todos' },
     { key: 'Confirmado', label: 'Confirmados' },
     { key: 'Pendente', label: 'Pendentes' },
     { key: 'Adiado', label: 'Adiados' },
     { key: 'Cancelado', label: 'Cancelados' },
   ];
-
-  if (!events.length) return '<p class="event-empty">Ainda não há eventos armazenados.</p>';
 
   const groupedEvents = events.reduce((groups, event) => {
     const groupKey = event.id_rejeitador ? 'Cancelado' : event.status;
@@ -56,11 +55,27 @@ function renderEvents(events) {
     return groups;
   }, { Confirmado: [], Pendente: [], Adiado: [], Cancelado: [] });
 
-  return statusOrder.filter(({ key }) => groupedEvents[key].length).map(({ key, label }) => `<section class="event-group">
-    <div class="event-group-head"><h2>${label}</h2><span>${groupedEvents[key].length}</span></div>
+  const filters = statusOrder.map(({ key, label }, index) => {
+    const count = key === 'Todos' ? events.length : groupedEvents[key].length;
+    return `<button class="event-filter${index === 0 ? ' active' : ''}" id="event-filter-${key.toLowerCase()}" type="button" role="tab" aria-selected="${index === 0}" aria-controls="event-filter-panel" tabindex="${index === 0 ? '0' : '-1'}" data-event-filter="${key}">
+      <span>${label}</span><span class="event-filter-count">${count}</span>
+    </button>`;
+  }).join('');
+
+  const groups = statusOrder.slice(1).filter(({ key }) => groupedEvents[key].length).map(({ key, label }) => `<section class="event-group" data-event-group="${key}">
+    <div class="event-group-head"><h2>${label}</h2><span data-event-group-count>${groupedEvents[key].length}</span></div>
     <div class="event-group-list">${groupedEvents[key].map((event) => {
     const [year, month, day] = event.data_evento.split('-');
     const monthName = months[Number(month) - 1] || month;
+    const searchableText = [
+      event.titulo,
+      event.descricao,
+      event.local,
+      event.nome_organizador,
+      event.data_evento,
+      `${day} ${monthName} ${year}`,
+      event.horario,
+    ].join(' ');
     const statusLabel = event.id_rejeitador ? 'Recusado' : event.status;
     const statusClass = statusLabel === 'Pendente'
       ? 'badge pending'
@@ -70,7 +85,7 @@ function renderEvents(events) {
           ? 'badge postponed'
           : 'badge';
 
-    return `<article class="event-card stored-event" data-event-id="${escapeHtml(event.id_evento)}" role="button" tabindex="0" aria-label="Visualizar ${escapeHtml(event.titulo)}">
+    return `<article class="event-card stored-event" data-event-id="${escapeHtml(event.id_evento)}" data-event-search="${escapeHtml(searchableText)}" role="button" tabindex="0" aria-label="Visualizar ${escapeHtml(event.titulo)}">
       <div class="date-chip"><strong>${escapeHtml(day)}</strong><span>${escapeHtml(monthName)}</span></div>
       <div>
         <div class="event-top"><h2>${escapeHtml(event.titulo)}</h2><span class="${statusClass}">${escapeHtml(statusLabel)}</span></div>
@@ -83,6 +98,14 @@ function renderEvents(events) {
     </article>`;
     }).join('')}</div>
   </section>`).join('');
+
+  return `<div class="event-browser">
+    <div class="event-filters" role="tablist" aria-label="Filtrar eventos por status">${filters}</div>
+    <div class="event-panel" id="event-filter-panel" role="tabpanel" aria-labelledby="event-filter-todos" tabindex="0">
+      ${groups}
+      <p class="event-filter-empty" data-event-filter-empty role="status" aria-live="polite" hidden></p>
+    </div>
+  </div>`;
 }
 
 function renderRecentHistory(events, user) {
@@ -219,6 +242,114 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
   const bridge = `
     <script>
       window.__AVISA_PROFILE__ = ${profileData};
+
+      function selectEventFilter(tab) {
+        const tabs = Array.from(document.querySelectorAll('[data-event-filter]'));
+        const panel = document.getElementById('event-filter-panel');
+
+        tabs.forEach(function (item) {
+          const selected = item === tab;
+          item.classList.toggle('active', selected);
+          item.setAttribute('aria-selected', String(selected));
+          item.tabIndex = selected ? 0 : -1;
+        });
+
+        panel.setAttribute('aria-labelledby', tab.id);
+        updateEventResults(true);
+      }
+
+      function normalizeEventSearch(value) {
+        return value.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();
+      }
+
+      function updateEventResults(animate) {
+        const activeTab = document.querySelector('[data-event-filter][aria-selected="true"]');
+        const groups = Array.from(document.querySelectorAll('[data-event-group]'));
+        const emptyState = document.querySelector('[data-event-filter-empty]');
+        const searchInput = document.getElementById('event-search-input');
+        if (!emptyState) return;
+
+        const query = normalizeEventSearch(searchInput ? searchInput.value : '');
+        const filter = activeTab ? activeTab.dataset.eventFilter : 'Todos';
+        let totalMatches = 0;
+        let visibleMatches = 0;
+
+        groups.forEach(function (group) {
+          const cards = Array.from(group.querySelectorAll('[data-event-id]'));
+          let groupMatches = 0;
+
+          cards.forEach(function (card) {
+            const matchesSearch = normalizeEventSearch(card.dataset.eventSearch || '').includes(query);
+            const matchesStatus = filter === 'Todos' || group.dataset.eventGroup === filter;
+            const visible = matchesSearch && matchesStatus;
+            card.hidden = !visible;
+            if (matchesSearch) groupMatches += 1;
+            if (visible) visibleMatches += 1;
+          });
+
+          totalMatches += groupMatches;
+          group.querySelector('[data-event-group-count]').textContent = groupMatches;
+          const visible = filter === 'Todos' ? groupMatches > 0 : group.dataset.eventGroup === filter && groupMatches > 0;
+          group.classList.remove('is-entering');
+          group.hidden = !visible;
+          if (visible && animate) {
+            void group.offsetWidth;
+            group.classList.add('is-entering');
+          }
+        });
+
+        document.querySelectorAll('[data-event-filter]').forEach(function (tab) {
+          const countElement = tab.querySelector('.event-filter-count');
+          const count = tab.dataset.eventFilter === 'Todos'
+            ? totalMatches
+            : groups.find(function (group) {
+              return group.dataset.eventGroup === tab.dataset.eventFilter;
+            })?.querySelector('[data-event-group-count]').textContent || '0';
+          countElement.textContent = count;
+        });
+
+        emptyState.hidden = visibleMatches > 0;
+        if (visibleMatches > 0) return;
+        if (query) {
+          emptyState.textContent = 'Nenhum evento encontrado com essa busca e esse filtro.';
+        } else if (filter !== 'Todos') {
+          emptyState.textContent = 'Nenhum evento neste status.';
+        } else {
+          emptyState.textContent = 'Ainda não há eventos armazenados.';
+        }
+      }
+
+      document.addEventListener('click', function (event) {
+        const tab = event.target.closest('[data-event-filter]');
+        if (tab) selectEventFilter(tab);
+      });
+
+      document.addEventListener('keydown', function (event) {
+        const tab = event.target.closest('[role="tab"][data-event-filter]');
+        if (!tab) return;
+
+        const tabs = Array.from(document.querySelectorAll('[role="tab"][data-event-filter]'));
+        const currentIndex = tabs.indexOf(tab);
+        let nextIndex;
+
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = tabs.length - 1;
+        else return;
+
+        event.preventDefault();
+        tabs[nextIndex].focus();
+        selectEventFilter(tabs[nextIndex]);
+      });
+
+      document.addEventListener('input', function (event) {
+        if (event.target.id === 'event-search-input') updateEventResults(false);
+      });
+
+      document.addEventListener('DOMContentLoaded', function () {
+        updateEventResults(false);
+      });
 
       document.addEventListener('click', function (event) {
         const eventCard = event.target.closest('[data-event-id]');

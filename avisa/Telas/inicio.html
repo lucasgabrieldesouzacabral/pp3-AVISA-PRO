@@ -89,13 +89,19 @@
             <h1>Eventos</h1>
             <p>Confira os próximos eventos acadêmicos</p>
           </div>
-          <a class="btn cta" href="criar-evento.html">
-            Criar Evento
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M5 12h14" />
-              <path d="m12 5 7 7-7 7" />
+          <label class="event-search">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-4-4" />
             </svg>
-          </a>
+            <input
+              id="event-search-input"
+              type="search"
+              aria-label="Buscar eventos por nome, local, data ou organizador"
+              placeholder="Buscar evento..."
+              autocomplete="off"
+            />
+          </label>
         </header>
 
         <section class="event-list">

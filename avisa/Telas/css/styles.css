@@ -824,16 +824,209 @@ button {
   width: auto;
 }
 
+.event-search {
+  display: flex;
+  width: min(100%, 340px);
+  height: 46px;
+  flex: 0 1 340px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 252, 245, 0.92);
+  color: var(--muted);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.event-search:focus-within {
+  border-color: var(--olive);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(74, 92, 28, 0.1);
+}
+
+.event-search .icon {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+}
+
+.event-search input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.event-search input::placeholder {
+  color: var(--muted);
+  opacity: 0.85;
+}
+
 .event-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
+.event-browser {
+  display: grid;
+  gap: 18px;
+}
+
+.event-filters {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 6px;
+  padding: 5px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 252, 245, 0.78);
+  scrollbar-width: thin;
+}
+
+.event-filter {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.event-filter:hover {
+  color: var(--forest);
+  background: rgba(215, 235, 122, 0.2);
+}
+
+.event-filter.active {
+  transform: translateY(-1px);
+  border-color: rgba(215, 235, 122, 0.3);
+  background: var(--forest);
+  color: var(--lime);
+  box-shadow: 0 5px 12px rgba(31, 42, 12, 0.16);
+}
+
+.event-filter:focus-visible {
+  outline: 3px solid var(--olive);
+  outline-offset: 2px;
+}
+
+.event-filter-count {
+  display: inline-grid;
+  min-width: 21px;
+  height: 21px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(47, 60, 20, 0.08);
+  color: var(--olive);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.event-filter.active .event-filter-count {
+  background: rgba(215, 235, 122, 0.2);
+  color: var(--lime);
+}
+
+.event-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  outline: none;
+}
+
 .event-group {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.event-group[hidden] {
+  display: none;
+}
+
+.event-group.is-entering {
+  animation: event-filter-enter 0.24s ease both;
+}
+
+.event-group.is-entering .event-card {
+  animation: event-card-enter 0.28s ease both;
+}
+
+.event-group.is-entering .event-card:nth-child(2) {
+  animation-delay: 0.035s;
+}
+
+.event-group.is-entering .event-card:nth-child(3) {
+  animation-delay: 0.07s;
+}
+
+.event-group.is-entering .event-card:nth-child(4) {
+  animation-delay: 0.105s;
+}
+
+.event-filter-empty {
+  margin: 0;
+  padding: 28px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+  background: rgba(255, 252, 245, 0.72);
+  color: var(--muted);
+  text-align: center;
+}
+
+[data-event-filter-empty][hidden] {
+  display: none;
+}
+
+@keyframes event-filter-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes event-card-enter {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .event-group + .event-group {
@@ -884,6 +1077,10 @@ button {
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease;
+}
+
+.event-card[hidden] {
+  display: none;
 }
 
 .event-top {
@@ -2091,6 +2288,23 @@ button {
     flex-direction: column;
   }
 
+  .event-filters {
+    width: 100%;
+    border-radius: 14px;
+  }
+
+  .event-search {
+    width: 100%;
+    flex: 0 1 auto;
+  }
+
+  .event-filter {
+    min-height: 38px;
+    gap: 6px;
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+
   .event-form-grid,
   .event-actions,
   .profile-form-card .form-actions {
@@ -2172,6 +2386,16 @@ button {
 
   .notification-item {
     padding: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-search,
+  .event-filter,
+  .event-group.is-entering,
+  .event-group.is-entering .event-card {
+    animation: none;
+    transition: none;
   }
 
   .notification-read {
