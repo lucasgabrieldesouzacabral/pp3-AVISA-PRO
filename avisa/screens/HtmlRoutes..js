@@ -340,12 +340,16 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
       .replaceAll('{{EVENT_MODERATION_ACTION}}', renderEventModeration(selectedEvent, user))
     : personalizedPage;
 
+  const calendarEventsJson = JSON.stringify(events || []).replace(/</g, '\\u003c');
+  const pageWithCalendar = route === 'calendario'
+    ? pageWithEventDetails.replace('{{CALENDAR_EVENTS_JSON}}', calendarEventsJson)
+    : pageWithEventDetails;
   const pageWithEvents = route === 'inicio'
-    ? pageWithEventDetails.replace(
+    ? pageWithCalendar.replace(
       /<section class="event-list">[\s\S]*?<\/section>/,
       `<section class="event-list">${renderEvents(events)}</section>`
     )
-    : pageWithEventDetails;
+    : pageWithCalendar;
   const pageWithHistory = route === 'perfil'
     ? pageWithEvents.replace('<div class="timeline">', `<div class="timeline">${renderRecentHistory(events, user)}`)
     : pageWithEvents;

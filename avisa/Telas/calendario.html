@@ -25,12 +25,12 @@
           </span>
           <span class="logo-word">AVISA<span>!</span></span>
         </a>
-        <nav class="nav">
+        <nav class="nav" aria-label="Navegação principal">
           <a href="inicio.html">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
             Início
           </a>
-          <a class="active" href="calendario.html">
+          <a class="active" href="calendario.html" aria-current="page">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
             Calendário
           </a>
@@ -48,22 +48,277 @@
           </a>
         </nav>
         <div class="sidebar-foot">
-          <div class="user-chip">
-            <div class="avatar">AS</div>
-            <div><strong>Ana Souza</strong><small>Discente</small></div>
-          </div>
+          <a class="user-chip" href="perfil.html" aria-label="Abrir meu perfil">
+            <div class="avatar">{{INICIAIS_USUARIO}}</div>
+            <div><strong>{{NOME_USUARIO}}</strong><small>{{TIPO_USUARIO}}</small></div>
+          </a>
           <a class="logout" href="index.html">Sair</a>
         </div>
       </aside>
       <main class="main">
         <header class="page-head">
           <div>
+            <span class="page-kicker">Organize sua rotina acadêmica</span>
             <h1>Calendário</h1>
-            <p>A visão mensal dos eventos acadêmicos entra nesta tela.</p>
+            <p>Encontre eventos, acompanhe as datas e confira cada detalhe.</p>
           </div>
+          <a class="btn cta" href="criar-evento.html">Criar evento</a>
         </header>
-        <div class="placeholder">Conteúdo desta tela em construção.</div>
+
+        <section class="calendar-layout" aria-label="Calendário de eventos">
+          <div class="calendar-panel">
+            <div class="calendar-toolbar">
+              <div>
+                <span class="page-kicker">Programação</span>
+                <h2 id="calendar-month" aria-live="polite"></h2>
+              </div>
+              <div class="calendar-controls">
+                <button class="calendar-today" type="button" data-calendar-action="today">Hoje</button>
+                <button class="calendar-arrow" type="button" data-calendar-action="previous" aria-label="Mês anterior">‹</button>
+                <button class="calendar-arrow" type="button" data-calendar-action="next" aria-label="Próximo mês">›</button>
+              </div>
+            </div>
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span>
+            </div>
+            <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Dias do mês"></div>
+            <div class="calendar-legend" aria-label="Legenda de status dos eventos">
+              <span><i class="calendar-dot confirmed"></i>Confirmado</span>
+              <span><i class="calendar-dot pending"></i>Pendente</span>
+              <span><i class="calendar-dot postponed"></i>Adiado</span>
+              <span><i class="calendar-dot cancelled"></i>Cancelado ou recusado</span>
+            </div>
+          </div>
+
+          <aside class="calendar-aside">
+            <section class="calendar-summary" aria-label="Resumo do mês">
+              <span class="page-kicker">Neste mês</span>
+              <div class="calendar-summary-number" id="month-event-count">0</div>
+              <p id="month-event-label">eventos na programação</p>
+              <div class="calendar-summary-stats">
+                <span><i class="calendar-dot confirmed"></i><strong id="month-confirmed-count">0</strong> confirmados</span>
+                <span><i class="calendar-dot pending"></i><strong id="month-pending-count">0</strong> aguardando confirmação</span>
+              </div>
+            </section>
+            <section class="calendar-agenda">
+              <div class="calendar-agenda-head">
+                <div>
+                  <span class="page-kicker">Agenda do dia</span>
+                  <h2 id="selected-date" aria-live="polite"></h2>
+                </div>
+                <span class="calendar-day-count" id="selected-day-count">0</span>
+              </div>
+              <div class="calendar-day-events" id="calendar-day-events"></div>
+            </section>
+          </aside>
+        </section>
       </main>
     </div>
+    <script id="calendar-events-json" type="application/json">{{CALENDAR_EVENTS_JSON}}</script>
+    <script>
+      const events = JSON.parse(document.getElementById('calendar-events-json').textContent);
+      const monthTitle = document.getElementById('calendar-month');
+      const calendarGrid = document.getElementById('calendar-grid');
+      const selectedDateTitle = document.getElementById('selected-date');
+      const dayEventsContainer = document.getElementById('calendar-day-events');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let selectedDate = new Date(today);
+      let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      function dateKey(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+
+      function eventStatus(event) {
+        if (event.id_rejeitador) return 'Recusado';
+        return event.status;
+      }
+
+      function statusClass(status) {
+        if (status === 'Pendente') return 'pending';
+        if (status === 'Adiado') return 'postponed';
+        if (status === 'Cancelado' || status === 'Recusado') return 'cancelled';
+        return 'confirmed';
+      }
+
+      function eventsOn(date) {
+        return events
+          .filter((event) => event.data_evento === dateKey(date))
+          .sort((first, second) => String(first.horario).localeCompare(String(second.horario)));
+      }
+
+      function renderMonthSummary(monthEvents) {
+        const confirmedCount = monthEvents.filter((event) => eventStatus(event) === 'Confirmado').length;
+        const pendingCount = monthEvents.filter((event) => eventStatus(event) === 'Pendente').length;
+        document.getElementById('month-event-count').textContent = monthEvents.length;
+        document.getElementById('month-event-label').textContent = monthEvents.length === 1
+          ? 'evento na programação'
+          : 'eventos na programação';
+        document.getElementById('month-confirmed-count').textContent = confirmedCount;
+        document.getElementById('month-pending-count').textContent = pendingCount;
+      }
+
+      function renderDayEvents(dayEvents) {
+        dayEventsContainer.replaceChildren();
+        document.getElementById('selected-day-count').textContent = dayEvents.length;
+
+        if (!dayEvents.length) {
+          const empty = document.createElement('div');
+          empty.className = 'calendar-empty';
+          const title = document.createElement('strong');
+          title.textContent = 'Nenhum evento nesta data';
+          const message = document.createElement('p');
+          message.textContent = 'Escolha outro dia no calendário para ver a programação.';
+          empty.append(title, message);
+          dayEventsContainer.append(empty);
+          return;
+        }
+
+        dayEvents.forEach((event) => {
+          const status = eventStatus(event);
+          const card = document.createElement('article');
+          card.className = 'calendar-event';
+          card.dataset.eventId = event.id_evento;
+          card.setAttribute('role', 'button');
+          card.setAttribute('tabindex', '0');
+          card.setAttribute('aria-label', `Ver detalhes de ${event.titulo}`);
+
+          const time = document.createElement('time');
+          time.className = 'calendar-event-time';
+          time.textContent = event.horario;
+          const content = document.createElement('div');
+          content.className = 'calendar-event-content';
+          const title = document.createElement('h3');
+          title.textContent = event.titulo;
+          const details = document.createElement('p');
+          details.textContent = event.local;
+          const badge = document.createElement('span');
+          badge.className = `badge ${statusClass(status)}`;
+          badge.textContent = status;
+          content.append(title, details, badge);
+          card.append(time, content);
+          dayEventsContainer.append(card);
+        });
+      }
+
+      function renderCalendar() {
+        const year = visibleMonth.getFullYear();
+        const month = visibleMonth.getMonth();
+        const monthEvents = events.filter((event) => {
+          const [eventYear, eventMonth] = event.data_evento.split('-').map(Number);
+          return eventYear === year && eventMonth === month + 1;
+        });
+
+        monthTitle.textContent = new Intl.DateTimeFormat('pt-BR', {
+          month: 'long',
+          year: 'numeric',
+        }).format(visibleMonth);
+        renderMonthSummary(monthEvents);
+        calendarGrid.replaceChildren();
+
+        const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const previousMonthDays = new Date(year, month, 0).getDate();
+
+        for (let index = 0; index < 42; index += 1) {
+          let day;
+          let dayMonth = month;
+          let dayYear = year;
+          let outsideMonth = false;
+
+          if (index < firstWeekday) {
+            day = previousMonthDays - firstWeekday + index + 1;
+            dayMonth -= 1;
+            outsideMonth = true;
+          } else if (index >= firstWeekday + daysInMonth) {
+            day = index - firstWeekday - daysInMonth + 1;
+            dayMonth += 1;
+            outsideMonth = true;
+          } else {
+            day = index - firstWeekday + 1;
+          }
+
+          const date = new Date(dayYear, dayMonth, day);
+          const dayEvents = eventsOn(date);
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'calendar-day';
+          cell.dataset.date = dateKey(date);
+          cell.setAttribute('role', 'gridcell');
+          cell.setAttribute('aria-label', `${date.toLocaleDateString('pt-BR', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}${dayEvents.length ? `, ${dayEvents.length} ${dayEvents.length === 1 ? 'evento' : 'eventos'}` : ', sem eventos'}`);
+          if (outsideMonth) cell.classList.add('outside-month');
+          if (dateKey(date) === dateKey(today)) cell.classList.add('is-today');
+          if (dateKey(date) === dateKey(selectedDate)) {
+            cell.classList.add('is-selected');
+            cell.setAttribute('aria-selected', 'true');
+          }
+
+          const number = document.createElement('span');
+          number.className = 'calendar-day-number';
+          number.textContent = day;
+          cell.append(number);
+
+          if (dayEvents.length) {
+            const markers = document.createElement('span');
+            markers.className = 'calendar-day-markers';
+            markers.setAttribute('aria-hidden', 'true');
+            dayEvents.slice(0, 3).forEach((event) => {
+              const marker = document.createElement('i');
+              marker.className = `calendar-dot ${statusClass(eventStatus(event))}`;
+              markers.append(marker);
+            });
+            if (dayEvents.length > 3) {
+              const extra = document.createElement('span');
+              extra.className = 'calendar-extra-count';
+              extra.textContent = `+${dayEvents.length - 3}`;
+              markers.append(extra);
+            }
+            cell.append(markers);
+          }
+
+          calendarGrid.append(cell);
+        }
+
+        selectedDateTitle.textContent = new Intl.DateTimeFormat('pt-BR', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }).format(selectedDate);
+        renderDayEvents(eventsOn(selectedDate));
+      }
+
+      document.addEventListener('click', (event) => {
+        const action = event.target.closest('[data-calendar-action]');
+        if (action) {
+          if (action.dataset.calendarAction === 'today') {
+            selectedDate = new Date(today);
+            visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          } else {
+            const direction = action.dataset.calendarAction === 'next' ? 1 : -1;
+            visibleMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + direction, 1);
+            selectedDate = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+          }
+          renderCalendar();
+          return;
+        }
+
+        const day = event.target.closest('[data-date]');
+        if (!day) return;
+        selectedDate = new Date(`${day.dataset.date}T00:00:00`);
+        visibleMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        renderCalendar();
+      });
+
+      renderCalendar();
+    </script>
   </body>
 </html>
