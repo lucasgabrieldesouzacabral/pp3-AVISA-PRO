@@ -62,7 +62,6 @@
             <h1>Calendário</h1>
             <p>Encontre eventos, acompanhe as datas e confira cada detalhe.</p>
           </div>
-          <a class="btn cta" href="criar-evento.html">Criar evento</a>
         </header>
 
         <section class="calendar-layout" aria-label="Calendário de eventos">
@@ -100,19 +99,24 @@
                 <span><i class="calendar-dot pending"></i><strong id="month-pending-count">0</strong> aguardando confirmação</span>
               </div>
             </section>
-            <section class="calendar-agenda">
-              <div class="calendar-agenda-head">
-                <div>
-                  <span class="page-kicker">Agenda do dia</span>
-                  <h2 id="selected-date" aria-live="polite"></h2>
-                </div>
-                <span class="calendar-day-count" id="selected-day-count">0</span>
-              </div>
-              <div class="calendar-day-events" id="calendar-day-events"></div>
-            </section>
           </aside>
         </section>
       </main>
+    </div>
+    <div class="calendar-modal" id="calendar-modal" hidden>
+      <section class="calendar-dialog" role="dialog" aria-modal="true" aria-labelledby="selected-date" tabindex="-1">
+        <header class="calendar-dialog-head">
+          <div>
+            <span class="page-kicker">Agenda do dia</span>
+            <h2 id="selected-date" aria-live="polite"></h2>
+          </div>
+          <div class="calendar-dialog-actions">
+            <span class="calendar-day-count" id="selected-day-count">0</span>
+            <button class="calendar-close" type="button" data-calendar-action="close" aria-label="Fechar agenda">×</button>
+          </div>
+        </header>
+        <div class="calendar-day-events" id="calendar-day-events"></div>
+      </section>
     </div>
     <script id="calendar-events-json" type="application/json">{{CALENDAR_EVENTS_JSON}}</script>
     <script>
@@ -121,6 +125,8 @@
       const calendarGrid = document.getElementById('calendar-grid');
       const selectedDateTitle = document.getElementById('selected-date');
       const dayEventsContainer = document.getElementById('calendar-day-events');
+      const calendarModal = document.getElementById('calendar-modal');
+      const calendarDialog = calendarModal.querySelector('.calendar-dialog');
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       let selectedDate = new Date(today);
@@ -296,9 +302,19 @@
         renderDayEvents(eventsOn(selectedDate));
       }
 
+      function closeDayEvents() {
+        calendarModal.hidden = true;
+        document.body.style.overflow = '';
+        calendarGrid.querySelector(`[data-date="${dateKey(selectedDate)}"]`)?.focus();
+      }
+
       document.addEventListener('click', (event) => {
         const action = event.target.closest('[data-calendar-action]');
         if (action) {
+          if (action.dataset.calendarAction === 'close') {
+            closeDayEvents();
+            return;
+          }
           if (action.dataset.calendarAction === 'today') {
             selectedDate = new Date(today);
             visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -316,6 +332,37 @@
         selectedDate = new Date(`${day.dataset.date}T00:00:00`);
         visibleMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
         renderCalendar();
+        calendarModal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        calendarModal.querySelector('[data-calendar-action="close"]').focus();
+      });
+
+      calendarModal.addEventListener('click', (event) => {
+        if (event.target === calendarModal) closeDayEvents();
+      });
+
+      calendarModal.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeDayEvents();
+          return;
+        }
+
+        if (event.key !== 'Tab') return;
+        const focusable = Array.from(calendarDialog.querySelectorAll(
+          'button:not(:disabled), [tabindex="0"]'
+        ));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       });
 
       renderCalendar();
