@@ -247,6 +247,9 @@
           const option = document.createElement('option');
           option.value = value;
           option.textContent = label;
+          if (Number(value) < new Date().getMonth() + 1 && Number(dateYearSelect.value || new Date().getFullYear()) === new Date().getFullYear()) {
+            option.disabled = true;
+          }
           dateMonthSelect.appendChild(option);
         });
 
@@ -254,6 +257,9 @@
           const option = document.createElement('option');
           option.value = String(year);
           option.textContent = String(year);
+          if (year < currentYear) {
+            option.disabled = true;
+          }
           dateYearSelect.appendChild(option);
         }
 
@@ -289,17 +295,40 @@
         const currentOptions = [...dateDaySelect.options].slice(1);
         currentOptions.forEach((option) => option.remove());
 
+        const today = new Date();
+        const isCurrentYear = selectedYear === today.getFullYear();
+        const isCurrentMonth = selectedMonth === today.getMonth() + 1;
+
         for (let day = 1; day <= maxDay; day += 1) {
           const option = document.createElement('option');
           option.value = String(day);
           option.textContent = String(day).padStart(2, '0');
+
+          if (isCurrentYear && isCurrentMonth && day < today.getDate()) {
+            option.disabled = true;
+          }
+
           dateDaySelect.appendChild(option);
         }
 
-        if (Number(dayValue) <= maxDay) {
+        if (Number(dayValue) <= maxDay && !(isCurrentYear && isCurrentMonth && Number(dayValue) < today.getDate())) {
           dateDaySelect.value = String(dayValue);
         } else {
           dateDaySelect.value = '';
+        }
+      }
+
+      function updateMonthOptions() {
+        const today = new Date();
+        const selectedYear = Number(dateYearSelect.value || today.getFullYear());
+
+        [...dateMonthSelect.options].forEach((option) => {
+          const monthNumber = Number(option.value);
+          option.disabled = selectedYear === today.getFullYear() && monthNumber < today.getMonth() + 1;
+        });
+
+        if (selectedYear === today.getFullYear() && Number(dateMonthSelect.value || 0) < today.getMonth() + 1) {
+          dateMonthSelect.value = String(today.getMonth() + 1);
         }
       }
 
@@ -318,18 +347,27 @@
 
       dateDaySelect.addEventListener('change', updateDateValue);
       dateMonthSelect.addEventListener('change', () => {
+        updateMonthOptions();
         updateDayOptions();
         updateDateValue();
       });
       dateYearSelect.addEventListener('change', () => {
+        updateMonthOptions();
         updateDayOptions();
         updateDateValue();
       });
+
+      dateMonthSelect.value = String(new Date().getMonth() + 1);
+      dateYearSelect.value = String(new Date().getFullYear());
+      updateMonthOptions();
+      updateDayOptions();
       supportFields.forEach((field) => {
         field.addEventListener('change', toggleSupportDetails);
       });
 
       generateDateOptions();
+      dateMonthSelect.value = String(new Date().getMonth() + 1);
+      dateYearSelect.value = String(new Date().getFullYear());
       updateDayOptions();
       toggleSupportDetails();
     </script>
