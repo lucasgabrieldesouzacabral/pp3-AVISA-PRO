@@ -5,7 +5,8 @@
     "version": "1.0.0",
     "plugins": [
       "expo-sqlite",
-      "expo-asset"
+      "expo-asset",
+      "expo-status-bar"
     ]
   }
 }

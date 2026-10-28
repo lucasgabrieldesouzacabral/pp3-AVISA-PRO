@@ -141,12 +141,32 @@
 
           <div class="event-form-grid">
             <div class="field event-field">
-              <label for="event-date">Data</label>
-              <input id="event-date" name="date" type="date" required />
+              <label>Data</label>
+              <div class="custom-date-picker">
+                <div class="date-picker-grid">
+                  <select id="event-date-day" class="picker-input" aria-label="Dia" required>
+                    <option value="">Dia</option>
+                  </select>
+                  <select id="event-date-month" class="picker-input" aria-label="Mês" required>
+                    <option value="">Mês</option>
+                  </select>
+                  <select id="event-date-year" class="picker-input" aria-label="Ano" required>
+                    <option value="">Ano</option>
+                  </select>
+                </div>
+                <input id="event-date" name="date" type="hidden" required />
+              </div>
             </div>
             <div class="field event-field">
               <label for="event-time">Horário</label>
-              <input id="event-time" name="time" type="time" required />
+              <div class="custom-time-picker">
+                <input
+                  id="event-time"
+                  name="time"
+                  type="time"
+                  required
+                />
+              </div>
             </div>
           </div>
 
@@ -201,6 +221,87 @@
       const supportFields = document.querySelectorAll('input[name="support"]');
       const supportDetailsWrap = document.getElementById('support-details-wrap');
       const supportDetailsInput = document.getElementById('support-details');
+      const dateDaySelect = document.getElementById('event-date-day');
+      const dateMonthSelect = document.getElementById('event-date-month');
+      const dateYearSelect = document.getElementById('event-date-year');
+      const dateHiddenInput = document.getElementById('event-date');
+
+      function generateDateOptions() {
+        const currentYear = new Date().getFullYear();
+        const monthOptions = [
+          { value: '1', label: 'Jan' },
+          { value: '2', label: 'Fev' },
+          { value: '3', label: 'Mar' },
+          { value: '4', label: 'Abr' },
+          { value: '5', label: 'Mai' },
+          { value: '6', label: 'Jun' },
+          { value: '7', label: 'Jul' },
+          { value: '8', label: 'Ago' },
+          { value: '9', label: 'Set' },
+          { value: '10', label: 'Out' },
+          { value: '11', label: 'Nov' },
+          { value: '12', label: 'Dez' },
+        ];
+
+        monthOptions.forEach(({ value, label }) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          dateMonthSelect.appendChild(option);
+        });
+
+        for (let year = currentYear; year <= currentYear + 3; year += 1) {
+          const option = document.createElement('option');
+          option.value = String(year);
+          option.textContent = String(year);
+          dateYearSelect.appendChild(option);
+        }
+
+        for (let day = 1; day <= 31; day += 1) {
+          const option = document.createElement('option');
+          option.value = String(day);
+          option.textContent = String(day).padStart(2, '0');
+          dateDaySelect.appendChild(option);
+        }
+      }
+
+      function updateDateValue() {
+        const day = dateDaySelect.value;
+        const month = dateMonthSelect.value;
+        const year = dateYearSelect.value;
+
+        if (!day || !month || !year) {
+          dateHiddenInput.value = '';
+          return;
+        }
+
+        const monthNumber = String(month).padStart(2, '0');
+        const dayNumber = String(day).padStart(2, '0');
+        dateHiddenInput.value = `${year}-${monthNumber}-${dayNumber}`;
+      }
+
+      function updateDayOptions() {
+        const dayValue = dateDaySelect.value;
+        const selectedMonth = Number(dateMonthSelect.value || 1);
+        const selectedYear = Number(dateYearSelect.value || new Date().getFullYear());
+        const maxDay = new Date(selectedYear, selectedMonth, 0).getDate();
+
+        const currentOptions = [...dateDaySelect.options].slice(1);
+        currentOptions.forEach((option) => option.remove());
+
+        for (let day = 1; day <= maxDay; day += 1) {
+          const option = document.createElement('option');
+          option.value = String(day);
+          option.textContent = String(day).padStart(2, '0');
+          dateDaySelect.appendChild(option);
+        }
+
+        if (Number(dayValue) <= maxDay) {
+          dateDaySelect.value = String(dayValue);
+        } else {
+          dateDaySelect.value = '';
+        }
+      }
 
       function toggleSupportDetails() {
         const checkedValue = document.querySelector('input[name="support"]:checked')?.value;
@@ -215,9 +316,22 @@
         }
       }
 
+      dateDaySelect.addEventListener('change', updateDateValue);
+      dateMonthSelect.addEventListener('change', () => {
+        updateDayOptions();
+        updateDateValue();
+      });
+      dateYearSelect.addEventListener('change', () => {
+        updateDayOptions();
+        updateDateValue();
+      });
       supportFields.forEach((field) => {
         field.addEventListener('change', toggleSupportDetails);
       });
+
+      generateDateOptions();
+      updateDayOptions();
+      toggleSupportDetails();
     </script>
   </body>
 </html>
