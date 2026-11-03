@@ -40,9 +40,14 @@ export default function App() {
       }
 
       if (data.type === 'viewEvent') {
-        const selected = events.find((event) => Number(event.id_evento) === Number(data.id_evento));
+        const selected = discenteAuthRoutes.getEventById(data.id_evento);
         if (!selected) throw new Error('Não foi possível localizar este evento salvo.');
-        setSelectedEvent(selected);
+        const registrations = discenteAuthRoutes.getEventSubscribers(data.id_evento);
+        setSelectedEvent({
+          ...selected,
+          inscricoes: registrations,
+          ja_inscrito: !!user?.id_usuario && registrations.some((subscription) => Number(subscription.id_usuario) === Number(user.id_usuario)),
+        });
         setRoute('visualizar-evento');
         return;
       }
@@ -107,6 +112,27 @@ export default function App() {
             ? 'O evento foi cancelado e uma notificação foi criada.'
             : 'A nova data foi salva e uma notificação foi criada.'
         );
+        return;
+      }
+
+      if (data.type === 'subscribeEvent') {
+        if (!user?.id_usuario) throw new Error('Entre na sua conta para se inscrever.');
+        const updatedEvent = discenteAuthRoutes.subscribeToEvent({
+          id_evento: data.id_evento,
+          id_usuario: user.id_usuario,
+          tipo_inscricao: data.tipo_inscricao || 'Participante',
+          justificativa_contribuicao: data.justificativa_contribuicao || '',
+        });
+        const refreshedEvents = discenteAuthRoutes.getEvents();
+        setEvents(refreshedEvents);
+        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        setSelectedEvent({
+          ...updatedEvent,
+          inscricoes: discenteAuthRoutes.getEventSubscribers(data.id_evento),
+          ja_inscrito: true,
+        });
+        setRoute('visualizar-evento');
+        Alert.alert('Inscrição confirmada', 'Sua inscrição foi registrada com sucesso.');
         return;
       }
 

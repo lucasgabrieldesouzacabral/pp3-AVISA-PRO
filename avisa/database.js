@@ -6,6 +6,7 @@ const WEB_USERS_KEY = 'meuavisa.usuarios';
 const WEB_INTERESTS_KEY = 'meuavisa.interesses';
 const WEB_EVENTS_KEY = 'meuavisa.eventos';
 const WEB_NOTIFICATIONS_KEY = 'meuavisa.notificacoes';
+const WEB_SUBSCRIPTIONS_KEY = 'meuavisa.inscricoes_evento';
 
 function getDatabase() {
   if (Platform.OS === 'web') {
@@ -215,6 +216,14 @@ function getWebNotifications() {
   return JSON.parse(window.localStorage.getItem(WEB_NOTIFICATIONS_KEY) || '[]');
 }
 
+function getWebSubscriptions() {
+  return JSON.parse(window.localStorage.getItem(WEB_SUBSCRIPTIONS_KEY) || '[]');
+}
+
+function saveWebSubscriptions(subscriptions) {
+  window.localStorage.setItem(WEB_SUBSCRIPTIONS_KEY, JSON.stringify(subscriptions));
+}
+
 function saveWebNotifications(notifications) {
   window.localStorage.setItem(WEB_NOTIFICATIONS_KEY, JSON.stringify(notifications));
 }
@@ -405,18 +414,207 @@ export function getEvents() {
         tipo_organizador: users.find((user) => user.id_usuario === event.id_organizador_principal)?.tipo_usuario || '',
         nome_confirmador: users.find((user) => user.id_usuario === event.id_confirmador)?.nome_completo || '',
         nome_rejeitador: users.find((user) => user.id_usuario === event.id_rejeitador)?.nome_completo || '',
+        total_inscritos: getWebSubscriptions().filter((subscription) => Number(subscription.id_evento) === Number(event.id_evento)).length,
       }))
       .sort((first, second) => `${first.data_evento} ${first.horario}`.localeCompare(`${second.data_evento} ${second.horario}`));
   }
 
   return getDatabase().getAllSync(
-    `SELECT e.*, u.nome_completo AS nome_organizador, u.tipo_usuario AS tipo_organizador, c.nome_completo AS nome_confirmador, r.nome_completo AS nome_rejeitador
+    `SELECT e.*, u.nome_completo AS nome_organizador, u.tipo_usuario AS tipo_organizador, c.nome_completo AS nome_confirmador, r.nome_completo AS nome_rejeitador,
+            COUNT(ie.id_usuario) AS total_inscritos
      FROM eventos e
      JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
      LEFT JOIN usuarios c ON c.id_usuario = e.id_confirmador
      LEFT JOIN usuarios r ON r.id_usuario = e.id_rejeitador
+     LEFT JOIN inscricoes_evento ie ON ie.id_evento = e.id_evento
+    GROUP BY e.id_evento, e.titulo, e.descricao, e.data_evento, e.horario, e.local, e.vagas_disponiveis,
+             e.suporte_terceiros, e.suporte_detalhes, e.status, e.justificativa_status, e.id_confirmador,
+             e.data_confirmacao, e.id_rejeitador, e.data_rejeicao, e.data_criacao, e.id_organizador_principal,
+             u.nome_completo, u.tipo_usuario, c.nome_completo, r.nome_completo
     ORDER BY e.data_evento, e.horario`
   );
+}
+
+export function getEventSubscribers(id_evento) {
+  const eventId = Number(id_evento);
+
+  if (!Number.isSafeInteger(eventId) || eventId < 1) return [];
+
+  if (Platform.OS === 'web') {
+    const users = getWebUsers();
+    return getWebSubscriptions()
+      .filter((subscription) => Number(subscription.id_evento) === eventId)
+      .map((subscription) => {
+        const user = users.find((currentUser) => Number(currentUser.id_usuario) === Number(subscription.id_usuario));
+        return {
+          ...subscription,
+          nome_completo: user?.nome_completo || 'Usuário',
+          tipo_usuario: user?.tipo_usuario || '',
+        };
+      })
+      .sort((first, second) => String(first.nome_completo).localeCompare(String(second.nome_completo)));
+  }
+
+  return getDatabase().getAllSync(
+    `SELECT ie.id_usuario, ie.id_evento, ie.tipo_inscricao, ie.justificativa_contribuicao, ie.presenca_confirmada,
+            u.nome_completo, u.tipo_usuario
+     FROM inscricoes_evento ie
+     JOIN usuarios u ON u.id_usuario = ie.id_usuario
+     WHERE ie.id_evento = ?
+     ORDER BY u.nome_completo COLLATE NOCASE ASC`,
+    [eventId]
+  );
+}
+
+export function getEventById(id_evento) {
+  const eventId = Number(id_evento);
+
+  if (!Number.isSafeInteger(eventId) || eventId < 1) return null;
+
+  if (Platform.OS === 'web') {
+    const users = getWebUsers();
+    const event = getWebEvents().find((item) => Number(item.id_evento) === eventId);
+    if (!event) return null;
+
+    const organizer = users.find((user) => Number(user.id_usuario) === Number(event.id_organizador_principal));
+    const confirmer = users.find((user) => Number(user.id_usuario) === Number(event.id_confirmador));
+    const rejecter = users.find((user) => Number(user.id_usuario) === Number(event.id_rejeitador));
+    return {
+      ...event,
+      nome_organizador: organizer?.nome_completo || '',
+      tipo_organizador: organizer?.tipo_usuario || '',
+      nome_confirmador: confirmer?.nome_completo || '',
+      nome_rejeitador: rejecter?.nome_completo || '',
+      total_inscritos: getWebSubscriptions().filter((subscription) => Number(subscription.id_evento) === eventId).length,
+      inscricoes: getEventSubscribers(eventId),
+    };
+  }
+
+  const event = getDatabase().getFirstSync(
+    `SELECT e.*, u.nome_completo AS nome_organizador, u.tipo_usuario AS tipo_organizador,
+            c.nome_completo AS nome_confirmador, r.nome_completo AS nome_rejeitador
+     FROM eventos e
+     JOIN usuarios u ON u.id_usuario = e.id_organizador_principal
+     LEFT JOIN usuarios c ON c.id_usuario = e.id_confirmador
+     LEFT JOIN usuarios r ON r.id_usuario = e.id_rejeitador
+     WHERE e.id_evento = ?`,
+    [eventId]
+  );
+
+  if (!event) return null;
+
+  return {
+    ...event,
+    total_inscritos: Number(
+      getDatabase().getFirstSync('SELECT COUNT(*) AS total_inscritos FROM inscricoes_evento WHERE id_evento = ?', [eventId])?.total_inscritos || 0
+    ),
+    inscricoes: getEventSubscribers(eventId),
+  };
+}
+
+export function subscribeToEvent(payload = {}) {
+  const eventId = Number(payload.id_evento);
+  const userId = Number(payload.id_usuario);
+  const tipoInscricao = String(payload.tipo_inscricao || 'Participante').trim();
+  const justificativaContribuicao = String(payload.justificativa_contribuicao || '').trim();
+
+  if (!Number.isSafeInteger(eventId) || eventId < 1) {
+    throw new Error('Evento inválido.');
+  }
+
+  if (!Number.isSafeInteger(userId) || userId < 1) {
+    throw new Error('Usuário inválido.');
+  }
+
+  if (!['Participante', 'Colaborador'].includes(tipoInscricao)) {
+    throw new Error('Selecione um tipo de inscrição válido.');
+  }
+
+  if (Platform.OS === 'web') {
+    const users = getWebUsers();
+    const user = users.find((item) => Number(item.id_usuario) === userId);
+    if (!user) throw new Error('Usuário não encontrado.');
+
+    const events = getWebEvents();
+    const event = events.find((item) => Number(item.id_evento) === eventId);
+    if (!event) throw new Error('Evento não encontrado.');
+    if (event.status !== 'Confirmado') throw new Error('Somente eventos confirmados aceitam inscrições.');
+    if (Number(event.id_organizador_principal) === userId) {
+      throw new Error('O organizador não pode se inscrever no próprio evento.');
+    }
+
+    const subscriptions = getWebSubscriptions().filter((subscription) => Number(subscription.id_evento) === eventId);
+    if (subscriptions.some((subscription) => Number(subscription.id_usuario) === userId)) {
+      throw new Error('Você já está inscrito neste evento.');
+    }
+
+    const remainingSpots = Number(event.vagas_disponiveis || 0);
+    if (remainingSpots < 1) {
+      throw new Error('Este evento já está lotado.');
+    }
+
+    const subscription = {
+      id_usuario: userId,
+      id_evento: eventId,
+      tipo_inscricao: tipoInscricao,
+      justificativa_contribuicao: justificativaContribuicao || null,
+      presenca_confirmada: 0,
+    };
+
+    const nextSubscriptions = [subscription, ...getWebSubscriptions().filter((item) => Number(item.id_evento) !== eventId)];
+    saveWebSubscriptions(nextSubscriptions);
+
+    const updatedEvent = {
+      ...event,
+      vagas_disponiveis: Math.max(0, remainingSpots - 1),
+    };
+    const nextEvents = events.map((item) => (Number(item.id_evento) === eventId ? updatedEvent : item));
+    window.localStorage.setItem(WEB_EVENTS_KEY, JSON.stringify(nextEvents));
+
+    createNotification(
+      userId,
+      `Sua inscrição no evento "${event.titulo}" foi registrada com sucesso.`
+    );
+
+    return getEventById(eventId);
+  }
+
+  const database = getDatabase();
+  const user = database.getFirstSync('SELECT id_usuario, tipo_usuario FROM usuarios WHERE id_usuario = ?', [userId]);
+  if (!user) throw new Error('Usuário não encontrado.');
+
+  const event = database.getFirstSync('SELECT * FROM eventos WHERE id_evento = ?', [eventId]);
+  if (!event) throw new Error('Evento não encontrado.');
+  if (event.status !== 'Confirmado') throw new Error('Somente eventos confirmados aceitam inscrições.');
+  if (Number(event.id_organizador_principal) === userId) {
+    throw new Error('O organizador não pode se inscrever no próprio evento.');
+  }
+
+  const alreadyRegistered = database.getFirstSync(
+    'SELECT id_usuario FROM inscricoes_evento WHERE id_usuario = ? AND id_evento = ?',
+    [userId, eventId]
+  );
+  if (alreadyRegistered) throw new Error('Você já está inscrito neste evento.');
+
+  const remainingSpots = Number(event.vagas_disponiveis || 0);
+  if (remainingSpots < 1) {
+    throw new Error('Este evento já está lotado.');
+  }
+
+  database.runSync(
+    `INSERT INTO inscricoes_evento (id_usuario, id_evento, tipo_inscricao, justificativa_contribuicao)
+     VALUES (?, ?, ?, ?)`,
+    [userId, eventId, tipoInscricao, justificativaContribuicao || null]
+  );
+
+  database.runSync(
+    `UPDATE eventos SET vagas_disponiveis = CASE WHEN vagas_disponiveis > 0 THEN vagas_disponiveis - 1 ELSE 0 END WHERE id_evento = ?`,
+    [eventId]
+  );
+
+  createNotification(userId, `Sua inscrição no evento "${event.titulo}" foi registrada com sucesso.`);
+
+  return getEventById(eventId);
 }
 
 export function rejectEvent(id_evento, id_usuario, justification) {

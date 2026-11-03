@@ -835,6 +835,99 @@ button {
   margin-top: 0;
 }
 
+.event-subscription {
+  width: min(100%, 900px);
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.event-subscription h2 {
+  margin: 0 0 5px;
+  font-family: 'Fraunces', serif;
+  font-size: 1.35rem;
+}
+
+.event-subscription p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.event-subscription form {
+  display: grid;
+  gap: 12px;
+}
+
+.event-subscription select,
+.event-subscription textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px 12px;
+  outline: none;
+  font: inherit;
+}
+
+.event-subscription select:focus,
+.event-subscription textarea:focus {
+  border-color: var(--olive);
+  box-shadow: 0 0 0 4px rgba(74, 92, 28, 0.1);
+}
+
+.event-subscription textarea {
+  resize: vertical;
+}
+
+.event-subscription .event-action-fields {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.subscriber-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.subscriber-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(215, 235, 122, 0.08);
+}
+
+.subscriber-list strong {
+  display: block;
+  color: var(--ink);
+}
+
+.subscriber-list small {
+  color: var(--muted);
+}
+
+.subscriber-list span {
+  color: var(--forest);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.event-subscription-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
 .moderation-actions {
   display: grid;
   grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1.1fr);

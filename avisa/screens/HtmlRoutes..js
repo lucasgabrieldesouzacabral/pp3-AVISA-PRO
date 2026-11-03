@@ -179,6 +179,111 @@ function renderNotifications(notifications) {
   ).join('');
 }
 
+function renderEventSubscription(event, user) {
+  const isCreator = Number(event?.id_organizador_principal) === Number(user?.id_usuario);
+  const remainingSpots = Number(event?.vagas_disponiveis || 0);
+  const alreadySubscribed = !!user?.id_usuario && (event?.inscricoes || []).some((subscription) => Number(subscription.id_usuario) === Number(user.id_usuario));
+  const canSubscribe = event?.status === 'Confirmado' && !isCreator && !!user?.id_usuario && !alreadySubscribed && remainingSpots > 0;
+
+  if (isCreator) {
+    const subscribers = event?.inscricoes || [];
+    return `
+      <section class="event-subscription">
+        <div>
+          <span class="page-kicker">Lista de inscritos</span>
+          <h2>Participantes confirmados</h2>
+        </div>
+        ${!subscribers.length
+          ? '<p class="event-subscription-empty">Ainda não há inscrições para este evento.</p>'
+          : `<ul class="subscriber-list">${subscribers.map((subscription) => `
+              <li>
+                <div>
+                  <strong>${escapeHtml(subscription.nome_completo || 'Usuário')}</strong>
+                  <small>${escapeHtml(subscription.tipo_inscricao || 'Participante')}</small>
+                </div>
+                <span>${escapeHtml(subscription.tipo_usuario || 'Usuário')}</span>
+              </li>
+            `).join('')}</ul>`}
+      </section>
+    `;
+  }
+
+  if (!user?.id_usuario) {
+    return `
+      <section class="event-subscription">
+        <div>
+          <span class="page-kicker">Inscrição</span>
+          <h2>Entre para se inscrever</h2>
+        </div>
+        <p>Faça login para confirmar sua presença neste evento.</p>
+      </section>
+    `;
+  }
+
+  if (event?.status !== 'Confirmado') {
+    return `
+      <section class="event-subscription">
+        <div>
+          <span class="page-kicker">Inscrição</span>
+          <h2>Inscrições encerradas</h2>
+        </div>
+        <p>Este evento só aceita inscrições quando estiver confirmado.</p>
+      </section>
+    `;
+  }
+
+  if (alreadySubscribed) {
+    return `
+      <section class="event-subscription subscribed">
+        <div>
+          <span class="page-kicker">Inscrição</span>
+          <h2>Você já está inscrito</h2>
+        </div>
+        <p>Seu nome já foi registrado para participar deste evento. Restam ${escapeHtml(remainingSpots)} vagas.</p>
+      </section>
+    `;
+  }
+
+  if (remainingSpots <= 0) {
+    return `
+      <section class="event-subscription closed">
+        <div>
+          <span class="page-kicker">Inscrição</span>
+          <h2>Evento lotado</h2>
+        </div>
+        <p>Não há vagas disponíveis para este evento no momento.</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="event-subscription">
+      <div>
+        <span class="page-kicker">Inscrição</span>
+        <h2>Quero participar</h2>
+      </div>
+      <form data-form-type="subscribeEvent">
+        <input type="hidden" name="id_evento" value="${escapeHtml(event.id_evento)}" />
+        <div class="event-action-fields">
+          <label>
+            Tipo de inscrição
+            <select name="tipo_inscricao">
+              <option value="Participante">Participante</option>
+              ${Number(event?.suporte_terceiros) === 1 ? '<option value="Colaborador">Colaborador</option>' : ''}
+            </select>
+          </label>
+        </div>
+        ${Number(event?.suporte_terceiros) === 1 ? `
+          <label for="subscription-contribution">Justificativa da contribuição
+            <textarea id="subscription-contribution" name="justificativa_contribuicao" rows="3" placeholder="Descreva como você vai colaborar no evento."></textarea>
+          </label>
+        ` : ''}
+        <button class="btn" type="submit">Inscrever-se</button>
+      </form>
+    </section>
+  `;
+}
+
 function renderEventActions(event, user) {
   if (Number(event?.id_organizador_principal) !== Number(user?.id_usuario)) return '';
   if (event.status === 'Cancelado') {
@@ -491,6 +596,7 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
       .replaceAll('{{EVENT_STATUS_REASON}}', escapeHtml(selectedEvent.justificativa_status || 'Não informada'))
       .replaceAll('{{EVENT_MODERATION_LABEL}}', selectedEvent.id_rejeitador ? 'Recusado por' : 'Confirmado por')
       .replaceAll('{{EVENT_MODERATION_PERSON}}', escapeHtml(selectedEvent.id_rejeitador ? (selectedEvent.nome_rejeitador || 'Não informado') : (selectedEvent.nome_confirmador || 'Ainda não confirmado')))
+      .replaceAll('{{EVENT_SUBSCRIPTION}}', renderEventSubscription(selectedEvent, user))
       .replaceAll('{{EVENT_ACTIONS}}', renderEventActions(selectedEvent, user))
       .replaceAll('{{EVENT_MODERATION_ACTION}}', renderEventModeration(selectedEvent, user))
     : personalizedPage;
