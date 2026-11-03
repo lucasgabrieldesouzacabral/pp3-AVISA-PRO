@@ -1050,7 +1050,7 @@ export function loginUser(email_institucional, senha) {
     );
 
     if (!usuario) {
-      throw new Error('Credenciais inválidas.');
+      throw new Error('Conta não encontrada ou senha incorreta.');
     }
 
     return { ...usuario, interesses: getWebInterests(usuario.id_usuario) };
@@ -1065,7 +1065,7 @@ export function loginUser(email_institucional, senha) {
   );
 
   if (!usuario) {
-    throw new Error('Credenciais inválidas.');
+    throw new Error('Conta não encontrada ou senha incorreta.');
   }
 
   const specificTable = usuario.tipo_usuario === 'Discente'

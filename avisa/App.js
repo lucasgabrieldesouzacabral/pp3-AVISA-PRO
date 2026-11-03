@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Platform, StyleSheet, View } from 'react-native';
 
 import discenteAuthRoutes from './services/discenteAuth';
 import HtmlRoute from './screens/HtmlRoutes..js';
@@ -53,11 +53,19 @@ export default function App() {
       }
 
       if (data.type === 'login') {
-        const usuario = discenteAuthRoutes.loginUser(data.email, data.password);
-        setUser(usuario);
-        setNotifications(discenteAuthRoutes.getNotifications(usuario.id_usuario));
-        setRoute('inicio');
-        Alert.alert('Login realizado', `Bem-vindo(a), ${usuario.nome_completo}.`);
+        try {
+          const usuario = discenteAuthRoutes.loginUser(data.email, data.password);
+          setUser(usuario);
+          setNotifications(discenteAuthRoutes.getNotifications(usuario.id_usuario));
+          setRoute('inicio');
+          Alert.alert('Login realizado', `Bem-vindo(a), ${usuario.nome_completo}.`);
+        } catch (error) {
+          if (Platform.OS === 'web') {
+            window.alert(`Erro ao entrar\n\n${error.message}`);
+          } else {
+            Alert.alert('Erro ao entrar', error.message);
+          }
+        }
         return;
       }
 

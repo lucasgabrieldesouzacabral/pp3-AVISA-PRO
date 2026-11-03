@@ -67,15 +67,7 @@ function renderEvents(events) {
     <div class="event-group-list">${groupedEvents[key].map((event) => {
     const [year, month, day] = event.data_evento.split('-');
     const monthName = months[Number(month) - 1] || month;
-    const searchableText = [
-      event.titulo,
-      event.descricao,
-      event.local,
-      event.nome_organizador,
-      event.data_evento,
-      `${day} ${monthName} ${year}`,
-      event.horario,
-    ].join(' ');
+    const searchableText = event.titulo;
     const statusLabel = event.id_rejeitador ? 'Recusado' : event.status;
     const statusClass = statusLabel === 'Pendente'
       ? 'badge pending'
@@ -408,7 +400,8 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
           let groupMatches = 0;
 
           cards.forEach(function (card) {
-            const matchesSearch = normalizeEventSearch(card.dataset.eventSearch || '').includes(query);
+            const title = card.dataset.eventSearch || card.querySelector('.event-top h2')?.textContent || '';
+            const matchesSearch = normalizeEventSearch(title).includes(query);
             const matchesStatus = filter === 'Todos' || group.dataset.eventGroup === filter;
             const visible = matchesSearch && matchesStatus;
             card.hidden = !visible;
@@ -472,13 +465,23 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
         selectEventFilter(tabs[nextIndex]);
       });
 
-      document.addEventListener('input', function (event) {
-        if (event.target.id === 'event-search-input') updateEventResults(false);
-      });
+      function bindEventSearch() {
+        const searchInput = document.getElementById('event-search-input');
+        if (!searchInput) return;
 
-      document.addEventListener('DOMContentLoaded', function () {
+        const updateSearch = function () {
+          updateEventResults(false);
+        };
+        searchInput.addEventListener('input', updateSearch);
+        searchInput.addEventListener('search', updateSearch);
         updateEventResults(false);
-      });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bindEventSearch, { once: true });
+      } else {
+        bindEventSearch();
+      }
 
       document.addEventListener('click', function (event) {
         const eventCard = event.target.closest('[data-event-id]');
@@ -619,8 +622,10 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
       .replace('<div class="notification-list"></div>', `<div class="notification-list">${renderNotifications(notifications || [])}</div>`)
       .replace('{{NOTIFICATION_COUNT}}', String((notifications || []).filter((notification) => !Number(notification.lida)).length))
     : pageWithHistory;
-
-  return pageWithNotifications.replace('</head>', `<style>${css}</style>${bridge}</head>`);
+  return pageWithNotifications.replace(
+    '</head>',
+    `<style>${css}</style>${bridge}</head>`
+  );
 }
 
 export default function HtmlRoute({ route, user, events, notifications, selectedEvent, onMessage }) {

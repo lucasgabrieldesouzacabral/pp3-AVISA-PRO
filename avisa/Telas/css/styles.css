@@ -1027,9 +1027,9 @@ button {
   gap: 6px;
   padding: 5px;
   overflow-x: auto;
-  border: 1px solid var(--line);
+  border: 1px solid var(--forest-deep);
   border-radius: 16px;
-  background: rgba(255, 252, 245, 0.78);
+  background: var(--forest);
   scrollbar-width: thin;
 }
 
@@ -1043,7 +1043,7 @@ button {
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.82);
   font: inherit;
   font-size: 0.84rem;
   font-weight: 600;
@@ -1058,39 +1058,39 @@ button {
 }
 
 .event-filter:hover {
-  color: var(--forest);
-  background: rgba(215, 235, 122, 0.2);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .event-filter.active {
   transform: translateY(-1px);
-  border-color: rgba(215, 235, 122, 0.3);
-  background: var(--forest);
-  color: var(--lime);
-  box-shadow: 0 5px 12px rgba(31, 42, 12, 0.16);
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--forest-deep);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
 }
 
 .event-filter:focus-visible {
-  outline: 3px solid var(--olive);
+  outline: 3px solid var(--lime);
   outline-offset: 2px;
 }
 
 .event-filter-count {
   display: inline-grid;
-  min-width: 21px;
+  width: 24px;
   height: 21px;
   place-items: center;
-  padding: 0 5px;
   border-radius: 999px;
-  background: rgba(47, 60, 20, 0.08);
-  color: var(--olive);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
   font-size: 0.72rem;
   font-weight: 700;
+  text-align: center;
 }
 
 .event-filter.active .event-filter-count {
-  background: rgba(215, 235, 122, 0.2);
-  color: var(--lime);
+  background: rgba(47, 60, 20, 0.1);
+  color: var(--forest-deep);
 }
 
 .event-panel {
@@ -1266,21 +1266,27 @@ button {
   border-radius: 18px;
   background: var(--forest);
   color: var(--lime);
-  display: grid;
-  place-items: center;
-  text-align: center;
-  line-height: 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
 }
 
 .date-chip strong {
+  width: 100%;
   font-family: 'Fraunces', serif;
   font-size: 1.5rem;
+  line-height: 1;
+  text-align: center;
 }
 
 .date-chip span {
+  width: 100%;
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-align: center;
 }
 
 .meta {
@@ -2001,6 +2007,7 @@ button {
   margin: 12px 0 4px;
   font-size: 1.9rem;
   font-family: 'Fraunces', serif;
+  font-weight: 500;
   letter-spacing: -0.04em;
 }
 
@@ -2601,3 +2608,4 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
