@@ -12,11 +12,15 @@ export default function App() {
   const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
-    discenteAuthRoutes.init();
-    setEvents(discenteAuthRoutes.getEvents());
+    const onLoad = async () => {
+      await discenteAuthRoutes.init();
+      setEvents(await discenteAuthRoutes.getEvents());
+    };
+
+    onLoad();
   }, []);
 
-  const handleMessage = (message) => {
+  const handleMessage = async (message) => {
     try {
       const data = typeof message === 'string' ? JSON.parse(message) : message;
 
@@ -33,16 +37,16 @@ export default function App() {
         const nextRoute = routes[data.route] || 'login';
         if (nextRoute === 'login') setUser(null);
         if (nextRoute === 'notificacoes' && user?.id_usuario) {
-          setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+          setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         }
         setRoute(nextRoute);
         return;
       }
 
       if (data.type === 'viewEvent') {
-        const selected = discenteAuthRoutes.getEventById(data.id_evento);
+        const selected = await discenteAuthRoutes.getEventById(data.id_evento);
         if (!selected) throw new Error('Não foi possível localizar este evento salvo.');
-        const registrations = discenteAuthRoutes.getEventSubscribers(data.id_evento);
+        const registrations = await discenteAuthRoutes.getEventSubscribers(data.id_evento);
         setSelectedEvent({
           ...selected,
           inscricoes: registrations,
@@ -54,9 +58,9 @@ export default function App() {
 
       if (data.type === 'login') {
         try {
-          const usuario = discenteAuthRoutes.loginUser(data.email, data.password);
+          const usuario = await discenteAuthRoutes.loginUser(data.email, data.password);
           setUser(usuario);
-          setNotifications(discenteAuthRoutes.getNotifications(usuario.id_usuario));
+          setNotifications(await discenteAuthRoutes.getNotifications(usuario.id_usuario));
           setRoute('inicio');
           Alert.alert('Login realizado', `Bem-vindo(a), ${usuario.nome_completo}.`);
         } catch (error) {
@@ -70,7 +74,7 @@ export default function App() {
       }
 
       if (data.type === 'register') {
-        const usuario = discenteAuthRoutes.registerUser({
+        const usuario = await discenteAuthRoutes.registerUser({
           nome_completo: data.name,
           email_institucional: data.email,
           matricula: data.matricula,
@@ -88,9 +92,9 @@ export default function App() {
 
       if (data.type === 'createEvent') {
         if (!user?.id_usuario) throw new Error('Entre na sua conta para publicar um evento.');
-        const createdEvent = discenteAuthRoutes.createEvent({ ...data, organizerId: user.id_usuario });
-        setEvents(discenteAuthRoutes.getEvents());
-        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        const createdEvent = await discenteAuthRoutes.createEvent({ ...data, organizerId: user.id_usuario });
+        setEvents(await discenteAuthRoutes.getEvents());
+        setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         setRoute('inicio');
         Alert.alert(
           'Evento publicado',
@@ -103,16 +107,16 @@ export default function App() {
 
       if (data.type === 'eventAction') {
         if (!user?.id_usuario) throw new Error('Entre na sua conta para alterar um evento.');
-        const updatedEvent = discenteAuthRoutes.updateEventStatus(
+        const updatedEvent = await discenteAuthRoutes.updateEventStatus(
           data.id_evento,
           user.id_usuario,
           data.action,
           data
         );
-        const refreshedEvents = discenteAuthRoutes.getEvents();
+        const refreshedEvents = await discenteAuthRoutes.getEvents();
         const refreshedEvent = refreshedEvents.find((event) => Number(event.id_evento) === Number(data.id_evento));
         setEvents(refreshedEvents);
-        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         setSelectedEvent(refreshedEvent || updatedEvent);
         Alert.alert(
           data.action === 'cancel' ? 'Evento cancelado' : 'Evento remarcado',
@@ -125,18 +129,18 @@ export default function App() {
 
       if (data.type === 'subscribeEvent') {
         if (!user?.id_usuario) throw new Error('Entre na sua conta para se inscrever.');
-        const updatedEvent = discenteAuthRoutes.subscribeToEvent({
+        const updatedEvent = await discenteAuthRoutes.subscribeToEvent({
           id_evento: data.id_evento,
           id_usuario: user.id_usuario,
           tipo_inscricao: data.tipo_inscricao || 'Participante',
           justificativa_contribuicao: data.justificativa_contribuicao || '',
         });
-        const refreshedEvents = discenteAuthRoutes.getEvents();
+        const refreshedEvents = await discenteAuthRoutes.getEvents();
         setEvents(refreshedEvents);
-        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         setSelectedEvent({
           ...updatedEvent,
-          inscricoes: discenteAuthRoutes.getEventSubscribers(data.id_evento),
+          inscricoes: await discenteAuthRoutes.getEventSubscribers(data.id_evento),
           ja_inscrito: true,
         });
         setRoute('visualizar-evento');
@@ -146,11 +150,11 @@ export default function App() {
 
       if (data.type === 'confirmEvent') {
         if (!user?.id_usuario) throw new Error('Entre na sua conta para confirmar um evento.');
-        const updatedEvent = discenteAuthRoutes.confirmEvent(data.id_evento, user.id_usuario);
-        const refreshedEvents = discenteAuthRoutes.getEvents();
+        const updatedEvent = await discenteAuthRoutes.confirmEvent(data.id_evento, user.id_usuario);
+        const refreshedEvents = await discenteAuthRoutes.getEvents();
         const refreshedEvent = refreshedEvents.find((event) => Number(event.id_evento) === Number(data.id_evento));
         setEvents(refreshedEvents);
-        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         setSelectedEvent(refreshedEvent || updatedEvent);
         Alert.alert('Evento confirmado', 'O organizador foi notificado sobre a confirmação.');
         return;
@@ -158,15 +162,15 @@ export default function App() {
 
       if (data.type === 'rejectEvent') {
         if (!user?.id_usuario) throw new Error('Entre na sua conta para recusar um evento.');
-        const updatedEvent = discenteAuthRoutes.rejectEvent(
+        const updatedEvent = await discenteAuthRoutes.rejectEvent(
           data.id_evento,
           user.id_usuario,
           data.justification
         );
-        const refreshedEvents = discenteAuthRoutes.getEvents();
+        const refreshedEvents = await discenteAuthRoutes.getEvents();
         const refreshedEvent = refreshedEvents.find((event) => Number(event.id_evento) === Number(data.id_evento));
         setEvents(refreshedEvents);
-        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         setSelectedEvent(refreshedEvent || updatedEvent);
         Alert.alert('Evento recusado', 'O organizador foi notificado e a justificativa foi registrada.');
         return;
@@ -174,26 +178,26 @@ export default function App() {
 
       if (data.type === 'markNotificationAsRead') {
         if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
-        discenteAuthRoutes.markNotificationAsRead(data.id_notificacao, user.id_usuario);
-        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        await discenteAuthRoutes.markNotificationAsRead(data.id_notificacao, user.id_usuario);
+        setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         return;
       }
 
       if (data.type === 'markAllNotificationsAsRead') {
         if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
-        discenteAuthRoutes.markAllNotificationsAsRead(user.id_usuario);
-        setNotifications(discenteAuthRoutes.getNotifications(user.id_usuario));
+        await discenteAuthRoutes.markAllNotificationsAsRead(user.id_usuario);
+        setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         return;
       }
 
       if (data.type === 'updateInterests') {
         if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
-        discenteAuthRoutes.updateUserInterests(user.id_usuario, data.interests);
+        await discenteAuthRoutes.updateUserInterests(user.id_usuario, data.interests);
       }
 
       if (data.type === 'updateProfile') {
         if (!user?.id_usuario) throw new Error('Usuário não autenticado.');
-        const updatedUser = discenteAuthRoutes.updateUserProfile(user.id_usuario, data);
+        const updatedUser = await discenteAuthRoutes.updateUserProfile(user.id_usuario, data);
         setUser(updatedUser);
         setRoute('perfil');
         Alert.alert('Perfil atualizado', 'Suas informações foram salvas com sucesso.');
