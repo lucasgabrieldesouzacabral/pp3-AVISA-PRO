@@ -8,6 +8,9 @@ import {
   loginUser,
   getUserInterests,
   updateUserInterests,
+  getUsers,
+  updatePushToken,
+  sendEventPushNotifications,
   getDiscenteById,
   getUserById,
   updateUserProfile,
@@ -49,6 +52,9 @@ export const authRoutes = {
   markAllNotificationsAsRead: (id_usuario) => markAllNotificationsAsRead(id_usuario),
   getUserInterests: (id_usuario) => getUserInterests(id_usuario),
   updateUserInterests: (id_usuario, interests) => updateUserInterests(id_usuario, interests),
+  getUsers: (excludeUserId) => getUsers(excludeUserId),
+  updatePushToken: (id_usuario, token) => updatePushToken(id_usuario, token),
+  sendEventPushNotifications: (userIds, event) => sendEventPushNotifications(userIds, event),
 };
 
 export const discenteAuthRoutes = authRoutes;

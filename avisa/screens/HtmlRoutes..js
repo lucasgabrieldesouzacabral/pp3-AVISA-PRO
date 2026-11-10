@@ -100,6 +100,21 @@ function renderEvents(events) {
   </div>`;
 }
 
+function renderNotificationRecipients(users, currentUser) {
+  const recipients = (users || []).filter(
+    (recipient) => Number(recipient.id_usuario) !== Number(currentUser?.id_usuario)
+  );
+
+  if (!recipients.length) {
+    return '<p class="notification-empty">Não há outras pessoas cadastradas.</p>';
+  }
+
+  return recipients.map((recipient) => `<label class="notification-recipient">
+    <input type="checkbox" name="notifyUserIds" value="${escapeHtml(recipient.id_usuario)}" />
+    <span><strong>${escapeHtml(recipient.nome_completo)}</strong><small>${escapeHtml(recipient.tipo_usuario || 'Usuário')}</small></span>
+  </label>`).join('');
+}
+
 function renderRecentHistory(events, user) {
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const isModerator = ['Docente', 'Servidor'].includes(user?.tipo_usuario);
@@ -336,7 +351,7 @@ function renderEventModeration(event, user) {
   </section>`;
 }
 
-function addBridge(html, css, route, user, events, notifications, selectedEvent) {
+function addBridge(html, css, route, user, users, events, notifications, selectedEvent) {
   const profileData = JSON.stringify({
     id_usuario: user?.id_usuario || null,
     interesses: user?.interesses || [],
@@ -535,6 +550,7 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
         const formElement = event.target;
         const form = new FormData(formElement);
         const data = Object.fromEntries(form.entries());
+        if ('${route}' === 'criar-evento') data.notifyUserIds = form.getAll('notifyUserIds');
         const message = JSON.stringify({
           type: formElement.getAttribute('data-form-type') || ('${route}' === 'cadastro' ? 'register' : '${route}' === 'criar-evento' ? 'createEvent' : '${route}' === 'editar-perfil' ? 'updateProfile' : 'login'),
           ...data,
@@ -603,11 +619,14 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
       .replaceAll('{{EVENT_ACTIONS}}', renderEventActions(selectedEvent, user))
       .replaceAll('{{EVENT_MODERATION_ACTION}}', renderEventModeration(selectedEvent, user))
     : personalizedPage;
+  const pageWithNotificationRecipients = route === 'criar-evento'
+    ? pageWithEventDetails.replace('{{EVENT_NOTIFICATION_USERS}}', renderNotificationRecipients(users, user))
+    : pageWithEventDetails;
 
   const calendarEventsJson = JSON.stringify(events || []).replace(/</g, '\\u003c');
   const pageWithCalendar = route === 'calendario'
-    ? pageWithEventDetails.replace('{{CALENDAR_EVENTS_JSON}}', calendarEventsJson)
-    : pageWithEventDetails;
+    ? pageWithNotificationRecipients.replace('{{CALENDAR_EVENTS_JSON}}', calendarEventsJson)
+    : pageWithNotificationRecipients;
   const pageWithEvents = route === 'inicio'
     ? pageWithCalendar.replace(
       /<section class="event-list">[\s\S]*?<\/section>/,
@@ -628,9 +647,13 @@ function addBridge(html, css, route, user, events, notifications, selectedEvent)
   );
 }
 
-export default function HtmlRoute({ route, user, events, notifications, selectedEvent, onMessage }) {
+export default function HtmlRoute({ route, user, users, events, notifications, selectedEvent, onMessage }) {
   const [html, setHtml] = useState('');
   const [loadError, setLoadError] = useState('');
+  const routeUsers = route === 'criar-evento' ? users : null;
+  const routeEvents = ['inicio', 'calendario', 'perfil'].includes(route) ? events : null;
+  const routeNotifications = route === 'notificacoes' ? notifications : null;
+  const routeSelectedEvent = route === 'visualizar-evento' ? selectedEvent : null;
 
   useEffect(() => {
     let active = true;
@@ -648,7 +671,18 @@ export default function HtmlRoute({ route, user, events, notifications, selected
           readAssetText(stylesheetAsset[0]),
         ]);
 
-        if (active) setHtml(addBridge(pageContent, css, route, user, events || [], notifications || [], selectedEvent));
+        if (active) {
+          setHtml(addBridge(
+            pageContent,
+            css,
+            route,
+            user,
+            routeUsers || [],
+            routeEvents || [],
+            routeNotifications || [],
+            routeSelectedEvent
+          ));
+        }
       } catch (error) {
         if (active) setLoadError(error?.message || 'Não foi possível carregar esta tela.');
       }
@@ -658,7 +692,7 @@ export default function HtmlRoute({ route, user, events, notifications, selected
     return () => {
       active = false;
     };
-  }, [route, user, events, notifications, selectedEvent]);
+  }, [route, user, routeUsers, routeEvents, routeNotifications, routeSelectedEvent]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;

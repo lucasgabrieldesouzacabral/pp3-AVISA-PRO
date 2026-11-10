@@ -5,8 +5,11 @@ CREATE TABLE IF NOT EXISTS usuarios (
   matricula TEXT UNIQUE,
   senha TEXT NOT NULL,
   tipo_usuario TEXT NOT NULL CHECK (tipo_usuario IN ('Discente', 'Docente', 'Servidor')),
+  expo_push_token TEXT,
   data_cadastro TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS expo_push_token TEXT;
 
 CREATE TABLE IF NOT EXISTS discentes (
   id_usuario BIGINT PRIMARY KEY REFERENCES usuarios (id_usuario) ON DELETE CASCADE,

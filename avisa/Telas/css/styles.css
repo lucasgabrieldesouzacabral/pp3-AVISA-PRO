@@ -641,6 +641,71 @@ button {
   margin-bottom: 7px;
 }
 
+.notification-field {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.notification-field legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.notification-help {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.notification-recipient-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.event-field label.notification-recipient {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.notification-recipient input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--olive);
+  flex: 0 0 auto;
+}
+
+.notification-recipient span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.notification-recipient small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.notification-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
 .choice {
   position: relative;
   min-height: 44px;
@@ -2608,4 +2673,3 @@ button {
     grid-template-columns: 1fr;
   }
 }
-

@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
+import { sendEventPushNotifications as sendExpoEventPushNotifications } from './services/pushNotifications';
 
 let db;
 const WEB_USERS_KEY = 'meuavisa.usuarios';
@@ -43,6 +44,7 @@ export function initDatabase() {
       matricula TEXT UNIQUE,
       senha TEXT NOT NULL,
       tipo_usuario TEXT NOT NULL CHECK (tipo_usuario IN ('Discente', 'Docente', 'Servidor')),
+      expo_push_token TEXT,
       data_cadastro TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -129,6 +131,11 @@ export function initDatabase() {
     );
   `);
 
+  const userColumns = getDatabase().getAllSync('PRAGMA table_info(usuarios)');
+  if (!userColumns.some((column) => column.name === 'expo_push_token')) {
+    getDatabase().execSync('ALTER TABLE usuarios ADD COLUMN expo_push_token TEXT');
+  }
+
   const eventColumns = getDatabase().getAllSync('PRAGMA table_info(eventos)');
   if (!eventColumns.some((column) => column.name === 'suporte_detalhes')) {
     getDatabase().execSync('ALTER TABLE eventos ADD COLUMN suporte_detalhes TEXT');
@@ -169,6 +176,7 @@ function normalizeEventPayload(payload) {
     suporte_detalhes: String(payload.supportDetails || '').trim(),
     vagas_disponiveis: spots,
     id_organizador_principal: Number(payload.organizerId),
+    notifyUserIds: [...new Set((Array.isArray(payload.notifyUserIds) ? payload.notifyUserIds : []).map(Number))],
   };
 
   if (!normalized.titulo || !normalized.descricao || !normalized.local) {
@@ -202,6 +210,10 @@ function normalizeEventPayload(payload) {
 
   if (!Number.isSafeInteger(normalized.id_organizador_principal) || normalized.id_organizador_principal < 1) {
     throw new Error('Entre na sua conta para publicar um evento.');
+  }
+
+  if (normalized.notifyUserIds.some((id) => !Number.isSafeInteger(id) || id < 1)) {
+    throw new Error('Selecione destinatários válidos para a notificação.');
   }
 
   if (!normalized.suporte_terceiros) normalized.suporte_detalhes = '';
@@ -321,17 +333,23 @@ export function markAllNotificationsAsRead(id_usuario) {
 
 export function createEvent(payload) {
   const event = normalizeEventPayload(payload);
+  const recipientIds = event.notifyUserIds.filter((id) => id !== event.id_organizador_principal);
 
   if (Platform.OS === 'web') {
     const users = getWebUsers();
     const organizer = users.find((user) => user.id_usuario === event.id_organizador_principal);
     if (!organizer) throw new Error('O usuário organizador não foi encontrado.');
+    const recipients = users.filter((user) => recipientIds.includes(Number(user.id_usuario)));
+    if (recipients.length !== recipientIds.length) {
+      throw new Error('Um ou mais destinatários selecionados não foram encontrados.');
+    }
 
     const events = getWebEvents();
     const autoConfirmed = ['Docente', 'Servidor'].includes(organizer.tipo_usuario);
     const createdAt = new Date().toISOString();
+    const { notifyUserIds, ...eventRecord } = event;
     const savedEvent = {
-      ...event,
+      ...eventRecord,
       id_evento: events.reduce((maxId, item) => Math.max(maxId, item.id_evento), 0) + 1,
       status: autoConfirmed ? 'Confirmado' : 'Pendente',
       id_confirmador: autoConfirmed ? organizer.id_usuario : null,
@@ -346,6 +364,10 @@ export function createEvent(payload) {
         ? `Seu evento "${savedEvent.titulo}" foi publicado e confirmado automaticamente.`
         : `Seu evento "${savedEvent.titulo}" foi publicado e está aguardando confirmação.`
     );
+    recipients.forEach((recipient) => createNotification(
+      recipient.id_usuario,
+      `Novo evento de ${organizer.nome_completo}: "${savedEvent.titulo}" em ${savedEvent.data_evento} às ${savedEvent.horario}.`
+    ));
     if (!autoConfirmed) {
       notifyAuthorities(`Novo evento de ${organizer.nome_completo}: "${savedEvent.titulo}" aguarda confirmação.`);
     }
@@ -355,10 +377,19 @@ export function createEvent(payload) {
   const database = getDatabase();
   const createdAt = new Date().toISOString();
   const organizer = database.getFirstSync(
-    'SELECT id_usuario, tipo_usuario FROM usuarios WHERE id_usuario = ?',
+    'SELECT id_usuario, nome_completo, tipo_usuario FROM usuarios WHERE id_usuario = ?',
     [event.id_organizador_principal]
   );
   if (!organizer) throw new Error('O usuário organizador não foi encontrado.');
+  const recipients = recipientIds.length
+    ? database.getAllSync(
+      `SELECT id_usuario FROM usuarios WHERE id_usuario IN (${recipientIds.map(() => '?').join(', ')})`,
+      recipientIds
+    )
+    : [];
+  if (recipients.length !== recipientIds.length) {
+    throw new Error('Um ou mais destinatários selecionados não foram encontrados.');
+  }
   const autoConfirmed = ['Docente', 'Servidor'].includes(organizer.tipo_usuario);
 
   const result = database.runSync(
@@ -398,6 +429,10 @@ export function createEvent(payload) {
       ? `Seu evento "${savedEvent.titulo}" foi publicado e confirmado automaticamente.`
       : `Seu evento "${savedEvent.titulo}" foi publicado e está aguardando confirmação.`
   );
+  recipients.forEach((recipient) => createNotification(
+    recipient.id_usuario,
+    `Novo evento de ${organizer.nome_completo}: "${savedEvent.titulo}" em ${savedEvent.data_evento} às ${savedEvent.horario}.`
+  ));
   if (!autoConfirmed) {
     notifyAuthorities(`Novo evento de ${organizer.nome_completo}: "${savedEvent.titulo}" aguarda confirmação.`);
   }
@@ -903,6 +938,7 @@ export function normalizeRegistrationPayload(payload) {
     curso: String(payload.curso || '').trim(),
     CNDB: String(payload.CNDB || '').trim(),
     cpf: String(payload.cpf || '').trim(),
+    expo_push_token: String(payload.expo_push_token || '').trim(),
   };
 }
 
@@ -964,6 +1000,7 @@ export function registerUser(payload) {
       matricula: data.matricula || null,
       senha: data.senha,
       tipo_usuario: data.tipo_usuario,
+      expo_push_token: data.expo_push_token || null,
       ...specificData,
     };
 
@@ -994,9 +1031,9 @@ export function registerUser(payload) {
   }
 
   database.runSync(
-    `INSERT INTO usuarios (nome_completo, email_institucional, matricula, senha, tipo_usuario)
-     VALUES (?, ?, ?, ?, ?)`,
-    [data.nome_completo, data.email_institucional, data.matricula || null, data.senha, data.tipo_usuario]
+    `INSERT INTO usuarios (nome_completo, email_institucional, matricula, senha, tipo_usuario, expo_push_token)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.nome_completo, data.email_institucional, data.matricula || null, data.senha, data.tipo_usuario, data.expo_push_token || null]
   );
 
   const usuario = database.getFirstSync(
@@ -1175,6 +1212,63 @@ export function getUserById(id_usuario) {
   );
 
   return { ...usuario, ...(specificData || {}), interesses: getUserInterests(id_usuario) };
+}
+
+export function getUsers(excludeUserId) {
+  const excludedId = Number(excludeUserId);
+  if (Platform.OS === 'web') {
+    return getWebUsers()
+      .filter((user) => Number(user.id_usuario) !== excludedId)
+      .map(({ id_usuario, nome_completo, tipo_usuario }) => ({ id_usuario, nome_completo, tipo_usuario }))
+      .sort((first, second) => String(first.nome_completo).localeCompare(String(second.nome_completo)));
+  }
+
+  return getDatabase()
+    .getAllSync(
+      'SELECT id_usuario, nome_completo, tipo_usuario FROM usuarios WHERE id_usuario != ? ORDER BY nome_completo',
+      [Number.isSafeInteger(excludedId) ? excludedId : 0]
+    );
+}
+
+export function updatePushToken(id_usuario, token) {
+  const userId = Number(id_usuario);
+  const pushToken = String(token || '').trim();
+  if (!Number.isSafeInteger(userId) || userId < 1 || !pushToken) {
+    throw new Error('Não foi possível atualizar o token de notificações deste usuário.');
+  }
+
+  if (Platform.OS === 'web') {
+    const users = getWebUsers();
+    const userIndex = users.findIndex((user) => Number(user.id_usuario) === userId);
+    if (userIndex < 0) throw new Error('Usuário não encontrado para atualizar o token push.');
+    users[userIndex] = { ...users[userIndex], expo_push_token: pushToken };
+    saveWebUsers(users);
+    return;
+  }
+
+  const result = getDatabase().runSync(
+    'UPDATE usuarios SET expo_push_token = ? WHERE id_usuario = ?',
+    [pushToken, userId]
+  );
+  if (!result.changes) throw new Error('Usuário não encontrado para atualizar o token push.');
+}
+
+export async function sendEventPushNotifications(userIds, event) {
+  const recipientIds = [...new Set((Array.isArray(userIds) ? userIds : []).map(Number))]
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
+  if (!recipientIds.length) return 0;
+
+  let users;
+  if (Platform.OS === 'web') {
+    users = getWebUsers().filter((user) => recipientIds.includes(Number(user.id_usuario)));
+  } else {
+    users = getDatabase().getAllSync(
+      `SELECT expo_push_token FROM usuarios WHERE id_usuario IN (${recipientIds.map(() => '?').join(', ')})`,
+      recipientIds
+    );
+  }
+
+  return sendExpoEventPushNotifications(users.map((user) => user.expo_push_token), event);
 }
 
 export function updateUserProfile(id_usuario, payload) {

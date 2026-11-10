@@ -1,15 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Platform, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, AppState, Platform, StyleSheet, View } from 'react-native';
 
 import discenteAuthRoutes from './services/discenteAuth';
+import {
+  getPushNotificationUnavailableReason,
+  registerForPushNotificationsAsync,
+  requestLocalNotificationPermissionAsync,
+  showLocalNotificationAsync,
+} from './services/pushNotifications';
 import HtmlRoute from './screens/HtmlRoutes..js';
+
+function notificationsAreEqual(current, next) {
+  return current.length === next.length && current.every((notification, index) => {
+    const nextNotification = next[index];
+    if (!nextNotification) return false;
+    const keys = Object.keys(notification);
+    return keys.length === Object.keys(nextNotification).length
+      && keys.every((key) => notification[key] === nextNotification[key]);
+  });
+}
 
 export default function App() {
   const [route, setRoute] = useState('login');
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [users, setUsers] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const seenNotificationIds = useRef(new Set());
 
   useEffect(() => {
     const onLoad = async () => {
@@ -19,6 +37,83 @@ export default function App() {
 
     onLoad();
   }, []);
+
+  useEffect(() => {
+    const userId = Number(user?.id_usuario);
+    if (!Number.isSafeInteger(userId) || userId < 1) {
+      seenNotificationIds.current = new Set();
+      return undefined;
+    }
+
+    let active = true;
+    let initialized = false;
+    let isPolling = false;
+    let ready = false;
+    let canShowLocalNotifications = false;
+    seenNotificationIds.current = new Set();
+
+    const pollNotifications = async () => {
+      if (!active || !ready || AppState.currentState !== 'active' || isPolling) return;
+
+      isPolling = true;
+      try {
+        const latestNotifications = await discenteAuthRoutes.getNotifications(userId);
+        if (!active) return;
+
+        setNotifications((current) => (
+          notificationsAreEqual(current, latestNotifications) ? current : latestNotifications
+        ));
+        const seenIds = seenNotificationIds.current;
+        if (!initialized) {
+          latestNotifications.forEach((notification) => seenIds.add(Number(notification.id_notificacao)));
+          initialized = true;
+          return;
+        }
+
+        const newNotifications = latestNotifications.filter(
+          (notification) => !seenIds.has(Number(notification.id_notificacao))
+        );
+        newNotifications.forEach((notification) => seenIds.add(Number(notification.id_notificacao)));
+
+        if (canShowLocalNotifications) {
+          for (const notification of newNotifications) {
+            try {
+              await showLocalNotificationAsync(notification);
+            } catch (error) {
+              console.error('Não foi possível exibir uma notificação local do AVISA.', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Não foi possível verificar novas notificações do AVISA.', error);
+      } finally {
+        isPolling = false;
+      }
+    };
+
+    const initializeNotifications = async () => {
+      try {
+        canShowLocalNotifications = await requestLocalNotificationPermissionAsync();
+      } catch (error) {
+        console.error('Não foi possível solicitar permissão para notificações locais.', error);
+      }
+      ready = true;
+      await pollNotifications();
+    };
+
+    const intervalId = setInterval(pollNotifications, 5000);
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') pollNotifications();
+    });
+
+    initializeNotifications();
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+      appStateSubscription.remove();
+    };
+  }, [user?.id_usuario]);
 
   const handleMessage = async (message) => {
     try {
@@ -38,6 +133,9 @@ export default function App() {
         if (nextRoute === 'login') setUser(null);
         if (nextRoute === 'notificacoes' && user?.id_usuario) {
           setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
+        }
+        if (nextRoute === 'criar-evento' && user?.id_usuario) {
+          setUsers(await discenteAuthRoutes.getUsers(user.id_usuario));
         }
         setRoute(nextRoute);
         return;
@@ -61,8 +159,24 @@ export default function App() {
           const usuario = await discenteAuthRoutes.loginUser(data.email, data.password);
           setUser(usuario);
           setNotifications(await discenteAuthRoutes.getNotifications(usuario.id_usuario));
+          let pushWarning = '';
+          if (!getPushNotificationUnavailableReason()) {
+            try {
+              const pushToken = await registerForPushNotificationsAsync();
+              if (pushToken) await discenteAuthRoutes.updatePushToken(usuario.id_usuario, pushToken);
+            } catch (error) {
+              pushWarning = `Não foi possível ativar notificações push: ${error.message}`;
+            }
+          }
           setRoute('inicio');
-          Alert.alert('Login realizado', `Bem-vindo(a), ${usuario.nome_completo}.`);
+          if (Platform.OS === 'web') {
+            window.alert(`Bem-vindo(a), ${usuario.nome_completo}.${pushWarning ? `\n\n${pushWarning}` : ''}`);
+          } else {
+            Alert.alert(
+              'Login realizado',
+              `Bem-vindo(a), ${usuario.nome_completo}.${pushWarning ? `\n\n${pushWarning}` : ''}`
+            );
+          }
         } catch (error) {
           if (Platform.OS === 'web') {
             window.alert(`Erro ao entrar\n\n${error.message}`);
@@ -74,6 +188,16 @@ export default function App() {
       }
 
       if (data.type === 'register') {
+        let pushToken = null;
+        let pushError = null;
+        if (!getPushNotificationUnavailableReason()) {
+          try {
+            pushToken = await registerForPushNotificationsAsync();
+          } catch (error) {
+            pushError = error;
+          }
+        }
+
         const usuario = await discenteAuthRoutes.registerUser({
           nome_completo: data.name,
           email_institucional: data.email,
@@ -83,25 +207,47 @@ export default function App() {
           curso: data.curso,
           CNDB: data.CNDB,
           cpf: data.cpf,
+          expo_push_token: pushToken,
         });
 
         setRoute('login');
-        Alert.alert('Cadastro realizado', `${usuario.tipo_usuario} cadastrado: ${usuario.nome_completo}`);
+        const pushStatus = pushError
+          ? `\n\nNão foi possível ativar notificações push: ${pushError.message}`
+          : pushToken
+            ? '\n\nNotificações push ativadas neste dispositivo.'
+            : getPushNotificationUnavailableReason()
+              ? ''
+              : '\n\nVocê poderá ativar notificações push em uma development build instalada em um dispositivo compatível.';
+        if (Platform.OS === 'web') {
+          window.alert(`${usuario.tipo_usuario} cadastrado: ${usuario.nome_completo}${pushStatus}`);
+        } else {
+          Alert.alert('Cadastro realizado', `${usuario.tipo_usuario} cadastrado: ${usuario.nome_completo}${pushStatus}`);
+        }
         return;
       }
 
       if (data.type === 'createEvent') {
         if (!user?.id_usuario) throw new Error('Entre na sua conta para publicar um evento.');
         const createdEvent = await discenteAuthRoutes.createEvent({ ...data, organizerId: user.id_usuario });
+        const recipientIds = Array.isArray(data.notifyUserIds) ? data.notifyUserIds : [];
+        if (recipientIds.length) {
+          try {
+            await discenteAuthRoutes.sendEventPushNotifications(recipientIds, createdEvent);
+          } catch (error) {
+            console.error('Não foi possível enviar notificações push sobre o evento.', error);
+          }
+        }
         setEvents(await discenteAuthRoutes.getEvents());
         setNotifications(await discenteAuthRoutes.getNotifications(user.id_usuario));
         setRoute('inicio');
-        Alert.alert(
-          'Evento publicado',
-          createdEvent.status === 'Confirmado'
+        const publishMessage = createdEvent.status === 'Confirmado'
             ? 'O evento foi salvo e confirmado automaticamente.'
-            : 'O evento foi salvo e está aguardando confirmação.'
-        );
+            : 'O evento foi salvo e está aguardando confirmação.';
+        if (Platform.OS === 'web') {
+          window.alert(publishMessage);
+        } else {
+          Alert.alert('Evento publicado', publishMessage);
+        }
         return;
       }
 
@@ -203,13 +349,17 @@ export default function App() {
         Alert.alert('Perfil atualizado', 'Suas informações foram salvas com sucesso.');
       }
     } catch (error) {
-      Alert.alert('Não foi possível concluir', error.message);
+      if (Platform.OS === 'web') {
+        window.alert(`Não foi possível concluir\n\n${error.message}`);
+      } else {
+        Alert.alert('Não foi possível concluir', error.message);
+      }
     }
   };
 
   return (
     <View style={styles.container}>
-      <HtmlRoute route={route} user={user} events={events} notifications={notifications} selectedEvent={selectedEvent} onMessage={handleMessage} />
+      <HtmlRoute route={route} user={user} users={users} events={events} notifications={notifications} selectedEvent={selectedEvent} onMessage={handleMessage} />
     </View>
   );
 }

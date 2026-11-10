@@ -210,6 +210,12 @@
             <input id="event-spots" name="spots" type="number" min="1" placeholder="50" required />
           </div>
 
+          <fieldset class="field event-field notification-field">
+            <legend>Notificar pessoas (opcional)</legend>
+            <p class="notification-help">Escolha quem receberá uma notificação sobre este evento.</p>
+            <div class="notification-recipient-list">{{EVENT_NOTIFICATION_USERS}}</div>
+          </fieldset>
+
           <div class="event-actions">
             <a class="btn btn-secondary" href="inicio.html">Cancelar</a>
             <button class="btn" type="submit">Publicar Evento</button>

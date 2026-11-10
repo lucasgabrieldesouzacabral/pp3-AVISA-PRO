@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
+import { sendEventPushNotifications as sendExpoEventPushNotifications } from './services/pushNotifications';
 
 function getExpoVariable(name) {
   const readProcess = typeof process !== 'undefined' ? process.env?.[name] : undefined;
@@ -43,6 +44,7 @@ function normalizeEventPayload(payload = {}) {
     suporte_detalhes: normalizeText(payload.supportDetails),
     vagas_disponiveis: spots,
     id_organizador_principal: Number(payload.organizerId),
+    notifyUserIds: [...new Set((Array.isArray(payload.notifyUserIds) ? payload.notifyUserIds : []).map(Number))],
   };
 
   if (!normalized.titulo || !normalized.descricao || !normalized.local) {
@@ -82,6 +84,10 @@ function normalizeEventPayload(payload = {}) {
 
   if (!Number.isSafeInteger(normalized.id_organizador_principal) || normalized.id_organizador_principal < 1) {
     throw new Error('Entre na sua conta para publicar um evento.');
+  }
+
+  if (normalized.notifyUserIds.some((id) => !Number.isSafeInteger(id) || id < 1)) {
+    throw new Error('Selecione destinatários válidos para a notificação.');
   }
 
   if (!normalized.suporte_terceiros) normalized.suporte_detalhes = '';
@@ -154,6 +160,7 @@ export function normalizeRegistrationPayload(payload = {}) {
     curso: normalizeText(payload.curso),
     CNDB: normalizeText(payload.CNDB),
     cpf: normalizeText(payload.cpf),
+    expo_push_token: normalizeText(payload.expo_push_token),
   };
 }
 
@@ -214,6 +221,7 @@ export async function registerUser(payload = {}) {
       matricula: normalized.matricula || null,
       senha: normalized.senha,
       tipo_usuario: normalized.tipo_usuario,
+      expo_push_token: normalized.expo_push_token || null,
     })
     .select('*')
     .single();
@@ -276,6 +284,52 @@ export async function loginUser(email_institucional, senha) {
   if (!data) throw new Error('E-mail ou senha inválidos.');
 
   return normalizeUserRecord({ ...data, interesses: await getUserInterests(data.id_usuario) });
+}
+
+export async function getUsers(excludeUserId) {
+  const client = getSupabaseClient();
+  let query = client
+    .from('usuarios')
+    .select('id_usuario, nome_completo, tipo_usuario')
+    .order('nome_completo', { ascending: true });
+
+  if (excludeUserId) query = query.neq('id_usuario', Number(excludeUserId));
+  const { data, error } = await query;
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updatePushToken(id_usuario, token) {
+  const userId = Number(id_usuario);
+  const pushToken = normalizeText(token);
+  if (!Number.isSafeInteger(userId) || userId < 1 || !pushToken) {
+    throw new Error('Não foi possível atualizar o token de notificações deste usuário.');
+  }
+
+  const client = getSupabaseClient();
+  const { error } = await client
+    .from('usuarios')
+    .update({ expo_push_token: pushToken })
+    .eq('id_usuario', userId);
+
+  if (error) throw error;
+}
+
+export async function sendEventPushNotifications(userIds, event) {
+  const recipientIds = [...new Set((Array.isArray(userIds) ? userIds : []).map(Number))]
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
+  if (!recipientIds.length) return 0;
+
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from('usuarios')
+    .select('expo_push_token')
+    .in('id_usuario', recipientIds);
+
+  if (error) throw error;
+
+  return sendExpoEventPushNotifications((data || []).map((user) => user.expo_push_token), event);
 }
 
 export async function getUserInterests(id_usuario) {
@@ -449,6 +503,22 @@ export async function createEvent(payload = {}) {
   const organizer = await getUserById(event.id_organizador_principal);
   if (!organizer) throw new Error('O usuário organizador não foi encontrado.');
 
+  const recipientIds = event.notifyUserIds.filter((id) => id !== event.id_organizador_principal);
+  let recipients = [];
+  if (recipientIds.length) {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('usuarios')
+      .select('id_usuario')
+      .in('id_usuario', recipientIds);
+
+    if (error) throw error;
+    recipients = data || [];
+    if (recipients.length !== recipientIds.length) {
+      throw new Error('Um ou mais destinatários selecionados não foram encontrados.');
+    }
+  }
+
   const autoConfirmed = ['Docente', 'Servidor'].includes(organizer.tipo_usuario);
   const createdAt = new Date().toISOString();
   const client = getSupabaseClient();
@@ -480,6 +550,8 @@ export async function createEvent(payload = {}) {
     : `Seu evento "${savedEvent.titulo}" foi publicado e está aguardando confirmação.`;
 
   await createNotification(event.id_organizador_principal, message);
+  const recipientMessage = `Novo evento de ${organizer.nome_completo}: "${savedEvent.titulo}" em ${savedEvent.data_evento} às ${savedEvent.horario}.`;
+  await Promise.all(recipients.map((recipient) => createNotification(recipient.id_usuario, recipientMessage)));
 
   if (!autoConfirmed) {
     await notifyAuthorities(`Novo evento de ${organizer.nome_completo}: "${savedEvent.titulo}" aguarda confirmação.`);

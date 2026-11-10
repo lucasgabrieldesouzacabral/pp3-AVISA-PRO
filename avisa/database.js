@@ -33,5 +33,8 @@ export const updateUserInterests = databaseModule.updateUserInterests;
 export const getDiscenteById = databaseModule.getDiscenteById;
 export const getUserById = databaseModule.getUserById;
 export const updateUserProfile = databaseModule.updateUserProfile;
+export const getUsers = databaseModule.getUsers;
+export const updatePushToken = databaseModule.updatePushToken;
+export const sendEventPushNotifications = databaseModule.sendEventPushNotifications;
 
 export default databaseModule;
