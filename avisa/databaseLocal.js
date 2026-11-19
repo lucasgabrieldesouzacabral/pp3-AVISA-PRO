@@ -74,6 +74,7 @@ export function initDatabase() {
       horario TEXT NOT NULL,
       local TEXT NOT NULL,
       vagas_disponiveis INTEGER,
+      colaboradores_disponiveis INTEGER NOT NULL DEFAULT 0,
       suporte_terceiros INTEGER NOT NULL DEFAULT 0 CHECK (suporte_terceiros IN (0, 1)),
       suporte_detalhes TEXT,
       status TEXT NOT NULL DEFAULT 'Pendente'
@@ -140,6 +141,9 @@ export function initDatabase() {
   if (!eventColumns.some((column) => column.name === 'suporte_detalhes')) {
     getDatabase().execSync('ALTER TABLE eventos ADD COLUMN suporte_detalhes TEXT');
   }
+  if (!eventColumns.some((column) => column.name === 'colaboradores_disponiveis')) {
+    getDatabase().execSync('ALTER TABLE eventos ADD COLUMN colaboradores_disponiveis INTEGER NOT NULL DEFAULT 0');
+  }
   if (!eventColumns.some((column) => column.name === 'data_criacao')) {
     getDatabase().execSync(`
       ALTER TABLE eventos ADD COLUMN data_criacao TEXT;
@@ -166,6 +170,7 @@ export function initDatabase() {
 function normalizeEventPayload(payload) {
   const support = String(payload.support || '').trim();
   const spots = Number(payload.spots);
+  const collaboratorSpots = Number(payload.collaboratorSpots);
   const normalized = {
     titulo: String(payload.title || '').trim(),
     descricao: String(payload.description || '').trim(),
@@ -175,6 +180,7 @@ function normalizeEventPayload(payload) {
     suporte_terceiros: support === 'yes' ? 1 : support === 'no' ? 0 : null,
     suporte_detalhes: String(payload.supportDetails || '').trim(),
     vagas_disponiveis: spots,
+    colaboradores_disponiveis: support === 'yes' ? collaboratorSpots : 0,
     id_organizador_principal: Number(payload.organizerId),
     notifyUserIds: [...new Set((Array.isArray(payload.notifyUserIds) ? payload.notifyUserIds : []).map(Number))],
   };
@@ -206,6 +212,12 @@ function normalizeEventPayload(payload) {
 
   if (normalized.suporte_terceiros && !normalized.suporte_detalhes) {
     throw new Error('Descreva o tipo de colaboração necessária.');
+  }
+  if (!Number.isSafeInteger(normalized.colaboradores_disponiveis) || normalized.colaboradores_disponiveis < 0) {
+    throw new Error('A quantidade de colaboradores deve ser um número inteiro igual ou maior que zero.');
+  }
+  if (normalized.suporte_terceiros && normalized.colaboradores_disponiveis < 1) {
+    throw new Error('Informe pelo menos um colaborador quando o evento precisar de suporte.');
   }
 
   if (!Number.isSafeInteger(normalized.id_organizador_principal) || normalized.id_organizador_principal < 1) {
@@ -394,10 +406,10 @@ export function createEvent(payload) {
 
   const result = database.runSync(
     `INSERT INTO eventos (
-       titulo, descricao, data_evento, horario, local, vagas_disponiveis,
+       titulo, descricao, data_evento, horario, local, vagas_disponiveis, colaboradores_disponiveis,
        suporte_terceiros, suporte_detalhes, status, id_confirmador, data_confirmacao,
        data_criacao, id_organizador_principal
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       event.titulo,
       event.descricao,
@@ -405,6 +417,7 @@ export function createEvent(payload) {
       event.horario,
       event.local,
       event.vagas_disponiveis,
+      event.colaboradores_disponiveis,
       event.suporte_terceiros,
       event.suporte_detalhes || null,
       autoConfirmed ? 'Confirmado' : 'Pendente',
@@ -462,7 +475,7 @@ export function getEvents() {
      LEFT JOIN usuarios c ON c.id_usuario = e.id_confirmador
      LEFT JOIN usuarios r ON r.id_usuario = e.id_rejeitador
      LEFT JOIN inscricoes_evento ie ON ie.id_evento = e.id_evento
-    GROUP BY e.id_evento, e.titulo, e.descricao, e.data_evento, e.horario, e.local, e.vagas_disponiveis,
+    GROUP BY e.id_evento, e.titulo, e.descricao, e.data_evento, e.horario, e.local, e.vagas_disponiveis, e.colaboradores_disponiveis,
              e.suporte_terceiros, e.suporte_detalhes, e.status, e.justificativa_status, e.id_confirmador,
              e.data_confirmacao, e.id_rejeitador, e.data_rejeicao, e.data_criacao, e.id_organizador_principal,
              u.nome_completo, u.tipo_usuario, c.nome_completo, r.nome_completo
@@ -584,8 +597,11 @@ export function subscribeToEvent(payload = {}) {
     }
 
     const remainingSpots = Number(event.vagas_disponiveis || 0);
-    if (remainingSpots < 1) {
-      throw new Error('Este evento já está lotado.');
+    const remainingCollaborators = Number(event.colaboradores_disponiveis || 0);
+    if ((tipoInscricao === 'Colaborador' ? remainingCollaborators : remainingSpots) < 1) {
+      throw new Error(tipoInscricao === 'Colaborador'
+        ? 'A quantidade de colaboradores deste evento já foi preenchida.'
+        : 'Este evento já está lotado.');
     }
 
     const subscription = {
@@ -601,7 +617,10 @@ export function subscribeToEvent(payload = {}) {
 
     const updatedEvent = {
       ...event,
-      vagas_disponiveis: Math.max(0, remainingSpots - 1),
+      vagas_disponiveis: tipoInscricao === 'Colaborador' ? remainingSpots : Math.max(0, remainingSpots - 1),
+      colaboradores_disponiveis: tipoInscricao === 'Colaborador'
+        ? Math.max(0, remainingCollaborators - 1)
+        : remainingCollaborators,
     };
     const nextEvents = events.map((item) => (Number(item.id_evento) === eventId ? updatedEvent : item));
     window.localStorage.setItem(WEB_EVENTS_KEY, JSON.stringify(nextEvents));
@@ -632,8 +651,11 @@ export function subscribeToEvent(payload = {}) {
   if (alreadyRegistered) throw new Error('Você já está inscrito neste evento.');
 
   const remainingSpots = Number(event.vagas_disponiveis || 0);
-  if (remainingSpots < 1) {
-    throw new Error('Este evento já está lotado.');
+  const remainingCollaborators = Number(event.colaboradores_disponiveis || 0);
+  if ((tipoInscricao === 'Colaborador' ? remainingCollaborators : remainingSpots) < 1) {
+    throw new Error(tipoInscricao === 'Colaborador'
+      ? 'A quantidade de colaboradores deste evento já foi preenchida.'
+      : 'Este evento já está lotado.');
   }
 
   database.runSync(
@@ -643,8 +665,10 @@ export function subscribeToEvent(payload = {}) {
   );
 
   database.runSync(
-    `UPDATE eventos SET vagas_disponiveis = CASE WHEN vagas_disponiveis > 0 THEN vagas_disponiveis - 1 ELSE 0 END WHERE id_evento = ?`,
-    [eventId]
+    `UPDATE eventos SET vagas_disponiveis = CASE WHEN ? = 'Participante' AND vagas_disponiveis > 0 THEN vagas_disponiveis - 1 ELSE vagas_disponiveis END,
+      colaboradores_disponiveis = CASE WHEN ? = 'Colaborador' AND colaboradores_disponiveis > 0 THEN colaboradores_disponiveis - 1 ELSE colaboradores_disponiveis END
+      WHERE id_evento = ?`,
+    [tipoInscricao, tipoInscricao, eventId]
   );
 
   createNotification(userId, `Sua inscrição no evento "${event.titulo}" foi registrada com sucesso.`);

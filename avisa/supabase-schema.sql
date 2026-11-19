@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS eventos (
   horario TIME NOT NULL,
   local TEXT NOT NULL,
   vagas_disponiveis INTEGER,
+  colaboradores_disponiveis INTEGER NOT NULL DEFAULT 0,
   suporte_terceiros INTEGER NOT NULL DEFAULT 0 CHECK (suporte_terceiros IN (0, 1)),
   suporte_detalhes TEXT,
   status TEXT NOT NULL DEFAULT 'Pendente' CHECK (status IN ('Pendente', 'Confirmado', 'Cancelado', 'Adiado')),
@@ -45,6 +46,8 @@ CREATE TABLE IF NOT EXISTS eventos (
   data_criacao TIMESTAMPTZ NOT NULL DEFAULT now(),
   id_organizador_principal BIGINT NOT NULL REFERENCES usuarios (id_usuario)
 );
+
+ALTER TABLE eventos ADD COLUMN IF NOT EXISTS colaboradores_disponiveis INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS inscricoes_evento (
   id_usuario BIGINT NOT NULL REFERENCES usuarios (id_usuario),
@@ -77,6 +80,28 @@ ALTER TABLE eventos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inscricoes_evento ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notificacoes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE usuario_interesses ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "usuarios_public_register" ON usuarios;
+DROP POLICY IF EXISTS "usuarios_public_login_select" ON usuarios;
+DROP POLICY IF EXISTS "usuarios_self_update" ON usuarios;
+DROP POLICY IF EXISTS "discentes_public_select" ON discentes;
+DROP POLICY IF EXISTS "discentes_public_insert" ON discentes;
+DROP POLICY IF EXISTS "docentes_public_select" ON docentes;
+DROP POLICY IF EXISTS "docentes_public_insert" ON docentes;
+DROP POLICY IF EXISTS "servidores_public_select" ON servidores;
+DROP POLICY IF EXISTS "servidores_public_insert" ON servidores;
+DROP POLICY IF EXISTS "eventos_public_select" ON eventos;
+DROP POLICY IF EXISTS "eventos_public_insert" ON eventos;
+DROP POLICY IF EXISTS "eventos_public_update" ON eventos;
+DROP POLICY IF EXISTS "inscricoes_public_select" ON inscricoes_evento;
+DROP POLICY IF EXISTS "inscricoes_public_insert" ON inscricoes_evento;
+DROP POLICY IF EXISTS "inscricoes_public_update" ON inscricoes_evento;
+DROP POLICY IF EXISTS "notificacoes_public_select" ON notificacoes;
+DROP POLICY IF EXISTS "notificacoes_public_insert" ON notificacoes;
+DROP POLICY IF EXISTS "notificacoes_public_update" ON notificacoes;
+DROP POLICY IF EXISTS "interesses_public_select" ON usuario_interesses;
+DROP POLICY IF EXISTS "interesses_public_insert" ON usuario_interesses;
+DROP POLICY IF EXISTS "interesses_public_update" ON usuario_interesses;
 
 CREATE POLICY "usuarios_public_register"
 ON usuarios

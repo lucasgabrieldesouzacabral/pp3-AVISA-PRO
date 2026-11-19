@@ -189,8 +189,10 @@ function renderNotifications(notifications) {
 function renderEventSubscription(event, user) {
   const isCreator = Number(event?.id_organizador_principal) === Number(user?.id_usuario);
   const remainingSpots = Number(event?.vagas_disponiveis || 0);
+  const remainingCollaborators = Number(event?.colaboradores_disponiveis || 0);
   const alreadySubscribed = !!user?.id_usuario && (event?.inscricoes || []).some((subscription) => Number(subscription.id_usuario) === Number(user.id_usuario));
-  const canSubscribe = event?.status === 'Confirmado' && !isCreator && !!user?.id_usuario && !alreadySubscribed && remainingSpots > 0;
+  const canSubscribe = event?.status === 'Confirmado' && !isCreator && !!user?.id_usuario && !alreadySubscribed
+    && (remainingSpots > 0 || remainingCollaborators > 0);
 
   if (isCreator) {
     const subscribers = event?.inscricoes || [];
@@ -246,12 +248,12 @@ function renderEventSubscription(event, user) {
           <span class="page-kicker">Inscrição</span>
           <h2>Você já está inscrito</h2>
         </div>
-        <p>Seu nome já foi registrado para participar deste evento. Restam ${escapeHtml(remainingSpots)} vagas.</p>
+        <p>Seu nome já foi registrado neste evento. Restam ${escapeHtml(remainingSpots)} vagas e ${escapeHtml(remainingCollaborators)} vagas de colaborador.</p>
       </section>
     `;
   }
 
-  if (remainingSpots <= 0) {
+  if (remainingSpots <= 0 && remainingCollaborators <= 0) {
     return `
       <section class="event-subscription closed">
         <div>
@@ -275,16 +277,12 @@ function renderEventSubscription(event, user) {
           <label>
             Tipo de inscrição
             <select name="tipo_inscricao">
-              <option value="Participante">Participante</option>
-              ${Number(event?.suporte_terceiros) === 1 ? '<option value="Colaborador">Colaborador</option>' : ''}
+              <option value="Participante" ${remainingSpots < 1 ? 'disabled' : ''}>Participante (${escapeHtml(remainingSpots)} vaga(s))</option>
+              ${Number(event?.suporte_terceiros) === 1 ? `<option value="Colaborador" ${remainingCollaborators < 1 ? 'disabled' : ''} ${remainingSpots < 1 ? 'selected' : ''}>Colaborador (${escapeHtml(remainingCollaborators)} vaga(s))</option>` : ''}
             </select>
           </label>
         </div>
-        ${Number(event?.suporte_terceiros) === 1 ? `
-          <label for="subscription-contribution">Justificativa da contribuição
-            <textarea id="subscription-contribution" name="justificativa_contribuicao" rows="3" placeholder="Descreva como você vai colaborar no evento."></textarea>
-          </label>
-        ` : ''}
+        <p class="subscription-capacity">${escapeHtml(remainingSpots)} vaga(s) para participantes · ${escapeHtml(remainingCollaborators)} para colaboradores</p>
         <button class="btn" type="submit">Inscrever-se</button>
       </form>
     </section>
@@ -361,6 +359,15 @@ function addBridge(html, css, route, user, users, events, notifications, selecte
       window.__AVISA_PROFILE__ = ${profileData};
 
       document.addEventListener('click', function (event) {
+        const detailsToggle = event.target.closest('[data-details-toggle]');
+        if (detailsToggle) {
+          const details = detailsToggle.closest('.event-preview').querySelector('[data-event-details]');
+          const expanded = detailsToggle.getAttribute('aria-expanded') === 'true';
+          details.hidden = expanded;
+          detailsToggle.setAttribute('aria-expanded', String(!expanded));
+          detailsToggle.textContent = expanded ? 'Ver mais informações' : 'Ver menos informações';
+          return;
+        }
         const toggle = event.target.closest('[data-history-toggle]');
         if (!toggle) return;
 
@@ -608,6 +615,7 @@ function addBridge(html, css, route, user, users, events, notifications, selecte
       .replaceAll('{{EVENT_TIME}}', escapeHtml(selectedEvent.horario))
       .replaceAll('{{EVENT_LOCATION}}', escapeHtml(selectedEvent.local))
       .replaceAll('{{EVENT_SPOTS}}', escapeHtml(selectedEvent.vagas_disponiveis))
+      .replaceAll('{{EVENT_COLLABORATOR_SPOTS}}', escapeHtml(selectedEvent.colaboradores_disponiveis || 0))
       .replaceAll('{{EVENT_SUPPORT}}', supportNeeded ? 'Sim' : 'Não')
       .replaceAll('{{EVENT_SUPPORT_DETAILS}}', escapeHtml(selectedEvent.suporte_detalhes || 'Não informado'))
       .replaceAll('{{EVENT_ORGANIZER}}', escapeHtml(selectedEvent.nome_organizador || 'Não informado'))

@@ -34,6 +34,7 @@ function normalizeText(value) {
 function normalizeEventPayload(payload = {}) {
   const support = normalizeText(payload.support);
   const spots = Number(payload.spots);
+  const collaboratorSpots = Number(payload.collaboratorSpots);
   const normalized = {
     titulo: normalizeText(payload.title),
     descricao: normalizeText(payload.description),
@@ -43,6 +44,7 @@ function normalizeEventPayload(payload = {}) {
     suporte_terceiros: support === 'yes' ? 1 : support === 'no' ? 0 : null,
     suporte_detalhes: normalizeText(payload.supportDetails),
     vagas_disponiveis: spots,
+    colaboradores_disponiveis: support === 'yes' ? collaboratorSpots : 0,
     id_organizador_principal: Number(payload.organizerId),
     notifyUserIds: [...new Set((Array.isArray(payload.notifyUserIds) ? payload.notifyUserIds : []).map(Number))],
   };
@@ -80,6 +82,12 @@ function normalizeEventPayload(payload = {}) {
 
   if (normalized.suporte_terceiros && !normalized.suporte_detalhes) {
     throw new Error('Descreva o tipo de colaboração necessária.');
+  }
+  if (!Number.isSafeInteger(normalized.colaboradores_disponiveis) || normalized.colaboradores_disponiveis < 0) {
+    throw new Error('A quantidade de colaboradores deve ser um número inteiro igual ou maior que zero.');
+  }
+  if (normalized.suporte_terceiros && normalized.colaboradores_disponiveis < 1) {
+    throw new Error('Informe pelo menos um colaborador quando o evento precisar de suporte.');
   }
 
   if (!Number.isSafeInteger(normalized.id_organizador_principal) || normalized.id_organizador_principal < 1) {
@@ -532,6 +540,7 @@ export async function createEvent(payload = {}) {
       horario: event.horario,
       local: event.local,
       vagas_disponiveis: event.vagas_disponiveis,
+      colaboradores_disponiveis: event.colaboradores_disponiveis,
       suporte_terceiros: event.suporte_terceiros,
       suporte_detalhes: event.suporte_detalhes || null,
       status: autoConfirmed ? 'Confirmado' : 'Pendente',
@@ -674,7 +683,12 @@ export async function subscribeToEvent(payload = {}) {
   if (alreadyRegistered) throw new Error('Você já está inscrito neste evento.');
 
   const remainingSpots = Number(event.vagas_disponiveis || 0);
-  if (remainingSpots < 1) throw new Error('Este evento já está lotado.');
+  const remainingCollaborators = Number(event.colaboradores_disponiveis || 0);
+  if ((tipoInscricao === 'Colaborador' ? remainingCollaborators : remainingSpots) < 1) {
+    throw new Error(tipoInscricao === 'Colaborador'
+      ? 'A quantidade de colaboradores deste evento já foi preenchida.'
+      : 'Este evento já está lotado.');
+  }
 
   const { error: insertError } = await client.from('inscricoes_evento').insert({
     id_usuario: userId,
@@ -686,8 +700,10 @@ export async function subscribeToEvent(payload = {}) {
 
   if (insertError) throw insertError;
 
-  const nextSpots = Math.max(0, remainingSpots - 1);
-  const { error: updateError } = await client.from('eventos').update({ vagas_disponiveis: nextSpots }).eq('id_evento', eventId);
+  const nextValues = tipoInscricao === 'Colaborador'
+    ? { colaboradores_disponiveis: Math.max(0, remainingCollaborators - 1) }
+    : { vagas_disponiveis: Math.max(0, remainingSpots - 1) };
+  const { error: updateError } = await client.from('eventos').update(nextValues).eq('id_evento', eventId);
   if (updateError) throw updateError;
 
   await createNotification(userId, `Sua inscrição no evento "${event.titulo}" foi registrada com sucesso.`);

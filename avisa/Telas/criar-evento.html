@@ -210,6 +210,12 @@
             <input id="event-spots" name="spots" type="number" min="1" placeholder="50" required />
           </div>
 
+          <div id="collaborator-spots-wrap" class="field event-field hidden-support-details">
+            <label for="event-collaborator-spots">Quantidade de colaboradores</label>
+            <input id="event-collaborator-spots" name="collaboratorSpots" type="number" min="1" value="1" required />
+            <small class="notification-help">Defina quantas pessoas poderão se inscrever como colaboradoras.</small>
+          </div>
+
           <fieldset class="field event-field notification-field">
             <legend>Notificar pessoas (opcional)</legend>
             <p class="notification-help">Escolha quem receberá uma notificação sobre este evento.</p>
@@ -227,6 +233,8 @@
       const supportFields = document.querySelectorAll('input[name="support"]');
       const supportDetailsWrap = document.getElementById('support-details-wrap');
       const supportDetailsInput = document.getElementById('support-details');
+      const collaboratorSpotsWrap = document.getElementById('collaborator-spots-wrap');
+      const collaboratorSpotsInput = document.getElementById('event-collaborator-spots');
       const dateDaySelect = document.getElementById('event-date-day');
       const dateMonthSelect = document.getElementById('event-date-month');
       const dateYearSelect = document.getElementById('event-date-year');
@@ -314,10 +322,15 @@
 
         if (checkedValue === 'yes') {
           supportDetailsWrap.classList.add('visible');
+          collaboratorSpotsWrap.classList.add('visible');
           supportDetailsInput.setAttribute('required', 'required');
+          collaboratorSpotsInput.setAttribute('required', 'required');
         } else {
           supportDetailsWrap.classList.remove('visible');
+          collaboratorSpotsWrap.classList.remove('visible');
           supportDetailsInput.removeAttribute('required');
+          collaboratorSpotsInput.removeAttribute('required');
+          collaboratorSpotsInput.value = '0';
           supportDetailsInput.value = '';
         }
       }

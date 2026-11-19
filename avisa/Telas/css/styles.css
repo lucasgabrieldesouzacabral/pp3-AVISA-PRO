@@ -1325,6 +1325,29 @@ button {
   outline-offset: 3px;
 }
 
+.subscription-capacity {
+  font-size: 0.9rem;
+}
+
+.details-toggle {
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--olive);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.event-details-extra {
+  margin-top: 18px;
+}
+
+.event-details-extra[hidden] {
+  display: none;
+}
+
 .date-chip {
   width: 78px;
   height: 78px;
